@@ -1,26 +1,237 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --color-cream: #f5eee2;
+  --color-paper: #fcf8f1;
+  --color-ink: #3b2f2a;
+  --color-ink-soft: #7c6b60;
+  --color-ink-faint: #a8998d;
+  --color-line: #e7dccb;
+  --color-terracotta: #c2673f;
+  --color-terracotta-dark: #a5532f;
+  --color-bordeaux: #7d2f33;
+  --color-sage: #7f9b6e;
+  --color-mustard: #e2b84f;
+  --color-lvl1: #9bb685;
+  --color-lvl2: #edc967;
+  --color-lvl3: #e69a5b;
+  --color-lvl4: #c95d51;
+
+  --font-sans: var(--font-manrope), system-ui, sans-serif;
+  --font-serif: var(--font-lora), Georgia, serif;
+  --font-hand: var(--font-caveat), cursive;
+
+  --radius-paper: 1.375rem;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-cream);
+  /* лёгкая фактура бумаги */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .45 0 0 0 0 .35 0 0 0 0 .25 0 0 0 .06 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background: #ecc9b4;
+}
+
+@layer components {
+  .paper {
+    background: var(--color-paper);
+    border: 1px solid #eadfce;
+    border-radius: var(--radius-paper);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.8) inset,
+      0 14px 34px -22px rgba(92, 60, 38, 0.45);
+  }
+
+  /* Страница блокнота: линейки + поле слева */
+  .lined {
+    --lh: 2rem;
+    line-height: var(--lh);
+    background-color: var(--color-paper);
+    background-image:
+      linear-gradient(to right, transparent 2.25rem, rgba(194, 103, 63, 0.35) 2.25rem, rgba(194, 103, 63, 0.35) calc(2.25rem + 1px), transparent calc(2.25rem + 1px)),
+      repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--lh) - 1px), var(--color-line) calc(var(--lh) - 1px), var(--color-line) var(--lh));
+    background-attachment: local;
+    padding: 0 1rem 0 3rem;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 999px;
+    padding: 0.85rem 1.5rem;
+    font-weight: 600;
+    font-size: 0.975rem;
+    transition: transform 0.15s, background-color 0.15s, box-shadow 0.15s, color 0.15s;
+    min-height: 3rem;
+    cursor: pointer;
+    user-select: none;
+  }
+  .btn:active {
+    transform: scale(0.98);
+  }
+  .btn:disabled {
+    opacity: 0.55;
+    pointer-events: none;
+  }
+  .btn-primary {
+    background: var(--color-terracotta);
+    color: #fff8f1;
+    box-shadow: 0 10px 22px -12px rgba(165, 83, 47, 0.8);
+  }
+  .btn-primary:hover {
+    background: var(--color-terracotta-dark);
+  }
+  .btn-ghost {
+    background: transparent;
+    color: var(--color-ink);
+    border: 1.5px solid #d9c9b4;
+  }
+  .btn-ghost:hover {
+    background: rgba(255, 255, 255, 0.55);
+    border-color: var(--color-ink-faint);
+  }
+  .btn-soft {
+    background: #efe3d2;
+    color: var(--color-ink);
+  }
+  .btn-soft:hover {
+    background: #e8d9c4;
+  }
+  .btn-sm {
+    min-height: 2.25rem;
+    padding: 0.45rem 0.95rem;
+    font-size: 0.875rem;
+  }
+
+  .field {
+    width: 100%;
+    border-radius: 0.9rem;
+    border: 1.5px solid #e2d4c1;
+    background: #fffdf9;
+    padding: 0.8rem 1rem;
+    font-size: 1rem;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .field:focus {
+    border-color: var(--color-terracotta);
+    box-shadow: 0 0 0 4px rgba(194, 103, 63, 0.14);
+  }
+  .label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-ink-soft);
+    margin-bottom: 0.4rem;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border-radius: 999px;
+    padding: 0.5rem 0.95rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    border: 1.5px solid #e3d5c2;
+    background: #fffdf9;
+    transition: all 0.15s;
+    cursor: pointer;
+  }
+
+  .eyebrow {
+    font-family: var(--font-hand);
+    font-size: 1.45rem;
+    line-height: 1;
+    color: var(--color-terracotta);
+  }
+
+  .h-display {
+    font-family: var(--font-serif);
+    font-weight: 500;
+    letter-spacing: -0.015em;
+    line-height: 1.1;
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes pop {
+  0% {
+    transform: scale(0.85);
+  }
+  60% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.animate-sheet {
+  animation: sheet-in 0.28s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.animate-fade {
+  animation: fade-in 0.2s ease-out;
+}
+.animate-pop {
+  animation: pop 0.25s ease-out;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom), 0.5rem);
+}
+
+/* ---------- Печать PDF-трекеров ---------- */
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  body {
+    background: #fff !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-page {
+    background: #fff !important;
+    break-after: page;
+    box-shadow: none !important;
+    border: none !important;
+  }
 }

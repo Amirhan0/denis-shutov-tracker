@@ -1,36 +1,64 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Денис Шутов | Психолог — платформа с трекерами
 
-## Getting Started
+Next.js 16 + SQLite (better-sqlite3). Один процесс, одна база-файл, без внешних сервисов.
 
-First, run the development server:
+## Быстрый старт
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run seed-demo      # демо: admin@demo.ru / demo12345, клиенты anna@ / maria@ / ivan@demo.ru
+npm run dev            # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Что внутри
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Раздел | Путь |
+|---|---|
+| Главная, «Как это работает», трекеры, PDF, о Денисе | `/` |
+| Регистрация → выбор привычек → кабинет | `/register` → `/app/welcome` → `/app` |
+| Вход / восстановление / смена пароля | `/login`, `/forgot`, `/reset/[token]`, `/app/settings` |
+| Быстрое заполнение всего дня (сценарий «1–2 минуты с телефона») | `/app/today` |
+| Рейтинг дня, Тревожность, Настроение (месяц + годовая таблица) | `/app/rating`, `/app/anxiety`, `/app/mood` |
+| Полезные привычки (до 5, история при замене сохраняется) | `/app/habits` |
+| Главное за день, Благодарность себе (автосохранение) | `/app/main`, `/app/gratitude` |
+| Еженедельная статистика (описательная) | `/app/stats` |
+| Админка: клиенты, карточка клиента, фильтр периода, задания | `/admin`, `/admin/clients/[id]` |
+| Редактирование набора настроений | `/admin/moods` |
+| PDF-трекеры для печати | `/pdf`, файл `public/trackers.pdf` |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+«Задания от психолога» уже работают: Денис пишет задание в карточке клиента — клиент видит его на главной кабинета.
 
-## Learn More
+## Запуск в продакшене
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+cp .env.example .env.production   # заполнить
+npm ci && npm run build
+npm run create-admin -- denis@mail.ru 'надёжный-пароль' 'Денис'
+npm start                          # порт 3000, держать через pm2 / systemd
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+HTTPS: поставить перед приложением Caddy (сертификат выпускается автоматически):
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+shutov-psy.ru {
+  reverse_proxy localhost:3000
+}
+```
 
-## Deploy on Vercel
+Нужен обычный VPS с диском: SQLite хранится в файле, поэтому Vercel и другие serverless-хостинги не подходят.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Безопасность данных
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- пароли хранятся в bcrypt, сессии — случайные токены, в базе только их SHA-256;
+- cookie `httpOnly` + `secure` + `sameSite=lax`, заголовки HSTS / X-Frame-Options / nosniff;
+- роли `client` и `admin`: все запросы клиента фильтруются по его `user_id` из сессии, админка проверяет роль на сервере;
+- автовыход после `SESSION_IDLE_MINUTES` бездействия (и на сервере, и в браузере);
+- ограничение попыток входа, согласие с политикой при регистрации;
+- резервные копии: `npm run backup` (хранит 30 последних в `./backups`), в cron: `0 3 * * * cd /srv/tracker && npm run backup`.
+
+## Что заменить перед запуском
+
+- ссылки Instagram / Telegram / email — в `.env` (`NEXT_PUBLIC_*`);
+- фото и текст о Денисе — `src/app/page.tsx`, блок `#about`;
+- текст политики конфиденциальности — `src/app/privacy/page.tsx` (нужны реквизиты оператора по 152-ФЗ);
+- после правок в `/pdf` пересоздать PDF: `npm run pdf` (при запущенном сайте).
