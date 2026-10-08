@@ -1,0 +1,8 @@
+denis-shutov.com {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:3000
+}
+
+www.denis-shutov.com {
+	redir https://denis-shutov.com{uri} permanent
+}

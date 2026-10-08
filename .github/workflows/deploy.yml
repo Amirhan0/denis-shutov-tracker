@@ -1,0 +1,24 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency: deploy
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Деплой на сервер
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo "77.240.39.53 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPUR7TJBWhT9cow6guPy4c1V29Q9FIPVVt44bmPtLrSX" > ~/.ssh/known_hosts
+          # ключ на сервере ограничен одной командой — запуском /srv/denis/deploy.sh
+          ssh -i ~/.ssh/deploy_key ubuntu@77.240.39.53
