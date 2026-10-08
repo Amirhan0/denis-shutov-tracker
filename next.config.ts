@@ -19,6 +19,11 @@ const nextConfig: NextConfig = {
       },
     },
   },
+  // Старый адрес на Vercel перекидывает на основной домен
+  async redirects() {
+    if (process.env.VERCEL !== "1") return [];
+    return [{ source: "/:path*", destination: "https://denis-shutov.com/:path*", permanent: false }];
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
