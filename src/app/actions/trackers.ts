@@ -81,6 +81,7 @@ export async function addHabit(title: string) {
   if (!t) return;
   const active = await getActiveHabits(user.id);
   if (active.length >= MAX_HABITS) throw new Error(`Можно вести не больше ${MAX_HABITS} привычек одновременно`);
+  if (active.some((h) => h.title.toLowerCase() === t.toLowerCase())) throw new Error("Такая привычка уже есть");
   const pos = active.reduce((m, h) => Math.max(m, h.position), -1) + 1;
   await db.prepare("INSERT INTO habits (user_id, title, position, created_at) VALUES (?, ?, ?, ?)").run(user.id, t, pos, await getToday());
   revalidatePath("/app", "layout");
@@ -133,15 +134,34 @@ export async function replaceHabit(id: number, title: string) {
 
 export async function saveOnboardingHabits(fd: FormData) {
   const user = await requireClient();
+  // Атомарно «занимаем» онбординг: повторная отправка формы (двойной тап, медленная сеть) ничего не добавит
+  const { changes } = await db.prepare("UPDATE users SET onboarded = 1 WHERE id = ? AND onboarded = 0").run(user.id);
+  if (changes === 0) redirect("/app");
+
   const today = await getToday();
-  const titles = fd.getAll("habit").map(cleanTitle).filter(Boolean).slice(0, MAX_HABITS);
-  const existing = (await getActiveHabits(user.id)).length;
-  await db.batch([
-    ...titles
-      .slice(0, MAX_HABITS - existing)
-      .map((t, i): [string, ...(string | number)[]] => ["INSERT INTO habits (user_id, title, position, created_at) VALUES (?, ?, ?, ?)", user.id, t, existing + i, today]),
-    ["UPDATE users SET onboarded = 1 WHERE id = ?", user.id],
-  ]);
+  const active = await getActiveHabits(user.id);
+  const seen = new Set(active.map((h) => h.title.toLowerCase()));
+  const titles: string[] = [];
+  for (const t of fd.getAll("habit").map(cleanTitle)) {
+    if (t && !seen.has(t.toLowerCase())) {
+      seen.add(t.toLowerCase());
+      titles.push(t);
+    }
+  }
+  const free = MAX_HABITS - active.length;
+  if (titles.length && free > 0) {
+    await db.batch(
+      titles
+        .slice(0, free)
+        .map((t, i): [string, ...(string | number)[]] => [
+          "INSERT INTO habits (user_id, title, position, created_at) VALUES (?, ?, ?, ?)",
+          user.id,
+          t,
+          active.length + i,
+          today,
+        ]),
+    );
+  }
   redirect("/app");
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useFormStatus } from "react-dom";
 import { saveOnboardingHabits } from "@/app/actions/trackers";
 import { MAX_HABITS } from "@/lib/trackers";
 
@@ -61,8 +62,17 @@ export function WelcomeForm() {
         </div>
       </div>
 
-      <button className="btn btn-primary w-full">{filled.length ? "Сохранить и перейти в кабинет" : "Пропустить — добавлю позже"}</button>
+      <SubmitButton label={filled.length ? "Сохранить и перейти в кабинет" : "Пропустить — добавлю позже"} />
       <p className="text-center text-xs text-ink-faint">Привычки можно изменить в любой момент</p>
     </form>
+  );
+}
+
+function SubmitButton({ label }: { label: string }) {
+  const { pending } = useFormStatus();
+  return (
+    <button className="btn btn-primary w-full" disabled={pending}>
+      {pending ? "Сохраняем…" : label}
+    </button>
   );
 }
