@@ -62,12 +62,12 @@ function avg(marks: Record<string, Mark>): number | null {
   return v.length ? v.reduce((s, m) => s + m.level, 0) / v.length : null;
 }
 
-export function computeStats(userId: number, from: string, to: string, periodWord = "За этот период"): Stats {
+export async function computeStats(userId: number, from: string, to: string, periodWord = "За этот период"): Promise<Stats> {
   const days = diffDays(from, to) + 1;
   const lead = periodWord;
 
   // Рейтинг дня
-  const ratingMarks = getMarks(userId, "rating", from, to);
+  const ratingMarks = await getMarks(userId, "rating", from, to);
   const rc = countLevels(ratingMarks);
   const rDom = dominant(rc);
   const ratingText = rDom
@@ -77,10 +77,10 @@ export function computeStats(userId: number, from: string, to: string, periodWor
       : "Рейтинг дня пока не отмечался.";
 
   // Тревожность + сравнение с предыдущим периодом такой же длины
-  const anxMarks = getMarks(userId, "anxiety", from, to);
+  const anxMarks = await getMarks(userId, "anxiety", from, to);
   const ac = countLevels(anxMarks);
   const aDom = dominant(ac);
-  const prevMarks = getMarks(userId, "anxiety", addDays(from, -days), addDays(from, -1));
+  const prevMarks = await getMarks(userId, "anxiety", addDays(from, -days), addDays(from, -1));
   const nowAvg = avg(anxMarks);
   const prevAvg = avg(prevMarks);
   let trend: string | null = null;
@@ -95,9 +95,9 @@ export function computeStats(userId: number, from: string, to: string, periodWor
   }
 
   // Настроение
-  const moodMarks = getMarks(userId, "mood", from, to);
+  const moodMarks = await getMarks(userId, "mood", from, to);
   const mc = countLevels(moodMarks);
-  const moods = new Map(getMoods(true).map((m) => [m.id, m.label]));
+  const moods = new Map((await getMoods(true)).map((m) => [m.id, m.label]));
   const freq = new Map<string, { count: number; zone: Level }>();
   for (const m of Object.values(moodMarks)) {
     const label = m.moodId ? moods.get(m.moodId) : m.note;
@@ -116,8 +116,8 @@ export function computeStats(userId: number, from: string, to: string, periodWor
       : "Настроение пока не отмечалось.";
 
   // Привычки
-  const habits = getHabitsInRange(userId, from, to);
-  const checks = getHabitChecks(userId, from, to);
+  const habits = await getHabitsInRange(userId, from, to);
+  const checks = await getHabitChecks(userId, from, to);
   const dates = range(from, to);
   const habitStats = habits.map((h) => {
     const possible = dates.filter((d) => habitActiveOn(h, d)).length;
@@ -136,8 +136,8 @@ export function computeStats(userId: number, from: string, to: string, periodWor
         : `Самой стабильной была привычка «${best.title}» (${best.pct}%). Реже всего получалось «${worst.title}» (${worst.pct}%).`;
   }
 
-  const entries = getEntries(userId, null, from, to);
-  const filled = getFilledDates(userId, from, to);
+  const entries = await getEntries(userId, null, from, to);
+  const filled = await getFilledDates(userId, from, to);
 
   return {
     from,

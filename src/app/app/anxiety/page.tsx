@@ -11,7 +11,7 @@ export default async function Page() {
       <PageTitle eyebrow="наблюдение за тревогой" title="Тревожность">
         Отмечайте, сколько тревоги было в течение дня — без оценок, просто наблюдение.
       </PageTitle>
-      <ColorTrackerView tracker="anxiety" today={today} initialMarks={getMarks(user.id, "anxiety", "2000-01-01", "2999-12-31")} />
+      <ColorTrackerView tracker="anxiety" today={today} initialMarks={await getMarks(user.id, "anxiety", "2000-01-01", "2999-12-31")} />
     </div>
   );
 }

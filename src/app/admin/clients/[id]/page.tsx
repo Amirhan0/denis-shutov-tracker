@@ -20,7 +20,7 @@ const PERIODS = [
 
 export default async function ClientPage({ params, searchParams }: PageProps<"/admin/clients/[id]">) {
   const { id } = await params;
-  const client = getClient(Number(id));
+  const client = await getClient(Number(id));
   if (!client) notFound();
   const sp = await searchParams;
   const tz = await getTz();
@@ -38,17 +38,17 @@ export default async function ClientPage({ params, searchParams }: PageProps<"/a
     if (diffDays(from, to) > 365) from = addDays(to, -365);
   }
 
-  const stats = computeStats(client.id, from, to);
-  const marks: Record<ColorTracker, ReturnType<typeof getMarks>> = {
-    rating: getMarks(client.id, "rating", from, to),
-    anxiety: getMarks(client.id, "anxiety", from, to),
-    mood: getMarks(client.id, "mood", from, to),
+  const stats = await computeStats(client.id, from, to);
+  const marks: Record<ColorTracker, Awaited<ReturnType<typeof getMarks>>> = {
+    rating: await getMarks(client.id, "rating", from, to),
+    anxiety: await getMarks(client.id, "anxiety", from, to),
+    mood: await getMarks(client.id, "mood", from, to),
   };
-  const moods = new Map(getMoods(true).map((m) => [m.id, m.label]));
-  const habits = getHabitsInRange(client.id, from, to);
-  const checks = getHabitChecks(client.id, from, to);
-  const entries = getEntries(client.id, null, from, to);
-  const assignments = getAssignments(client.id, true);
+  const moods = new Map((await getMoods(true)).map((m) => [m.id, m.label]));
+  const habits = await getHabitsInRange(client.id, from, to);
+  const checks = await getHabitChecks(client.id, from, to);
+  const entries = await getEntries(client.id, null, from, to);
+  const assignments = await getAssignments(client.id, true);
   const days = range(from, to).reverse();
   const last = utcToLocalDate(client.last_active_at, tz);
 

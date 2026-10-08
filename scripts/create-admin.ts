@@ -1,4 +1,4 @@
-// Создать или обновить аккаунт психолога:
+// Создать или обновить аккаунт психолога (база берётся из TURSO_DATABASE_URL или локальный файл):
 //   npm run create-admin -- denis@mail.ru 'надёжный-пароль' 'Денис'
 import bcrypt from "bcryptjs";
 import { db } from "../src/lib/db.ts";
@@ -9,8 +9,10 @@ if (!login || !password || password.length < 8) {
   process.exit(1);
 }
 const hash = bcrypt.hashSync(password, 12);
-db.prepare(
-  `INSERT INTO users (name, login, password_hash, role, onboarded, consent_at) VALUES (?, ?, ?, 'admin', 1, datetime('now'))
-   ON CONFLICT (login) DO UPDATE SET password_hash = excluded.password_hash, role = 'admin', name = excluded.name`,
-).run(name, login.trim().toLowerCase(), hash);
+await db
+  .prepare(
+    `INSERT INTO users (name, login, password_hash, role, onboarded, consent_at) VALUES (?, ?, ?, 'admin', 1, datetime('now'))
+     ON CONFLICT (login) DO UPDATE SET password_hash = excluded.password_hash, role = 'admin', name = excluded.name`,
+  )
+  .run(name, login.trim().toLowerCase(), hash);
 console.log(`Готово: администратор ${login}`);

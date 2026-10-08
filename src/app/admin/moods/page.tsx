@@ -13,8 +13,8 @@ function ZoneSelect({ value }: { value?: number }) {
   );
 }
 
-export default function MoodsPage() {
-  const moods = getMoods(true);
+export default async function MoodsPage() {
+  const moods = await getMoods(true);
   return (
     <div className="mx-auto max-w-2xl">
       <PageTitle eyebrow="настройки" title="Настроения">

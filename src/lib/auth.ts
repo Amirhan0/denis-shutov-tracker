@@ -29,8 +29,8 @@ export function sha256(value: string) {
 export async function createSession(userId: number) {
   const token = crypto.randomBytes(32).toString("base64url");
   const now = Date.now();
-  db.prepare("INSERT INTO sessions (id, user_id, created_at, last_seen) VALUES (?, ?, ?, ?)").run(sha256(token), userId, now, now);
-  db.prepare("DELETE FROM sessions WHERE last_seen < ?").run(now - IDLE_MS);
+  await db.prepare("INSERT INTO sessions (id, user_id, created_at, last_seen) VALUES (?, ?, ?, ?)").run(sha256(token), userId, now, now);
+  await db.prepare("DELETE FROM sessions WHERE last_seen < ?").run(now - IDLE_MS);
   (await cookies()).set(SESSION_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -42,7 +42,7 @@ export async function createSession(userId: number) {
 export async function destroySession() {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
-  if (token) db.prepare("DELETE FROM sessions WHERE id = ?").run(sha256(token));
+  if (token) await db.prepare("DELETE FROM sessions WHERE id = ?").run(sha256(token));
   jar.delete(SESSION_COOKIE);
 }
 
@@ -50,23 +50,23 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return null;
   const id = sha256(token);
-  const session = db.prepare("SELECT user_id, created_at, last_seen FROM sessions WHERE id = ?").get(id) as
+  const session = (await db.prepare("SELECT user_id, created_at, last_seen FROM sessions WHERE id = ?").get(id)) as
     | { user_id: number; created_at: number; last_seen: number }
     | undefined;
   if (!session) return null;
 
   const now = Date.now();
   if (now - session.last_seen > IDLE_MS || now - session.created_at > MAX_AGE_MS) {
-    db.prepare("DELETE FROM sessions WHERE id = ?").run(id);
+    await db.prepare("DELETE FROM sessions WHERE id = ?").run(id);
     return null;
   }
   if (now - session.last_seen > 30_000) {
-    db.prepare("UPDATE sessions SET last_seen = ? WHERE id = ?").run(now, id);
+    await db.prepare("UPDATE sessions SET last_seen = ? WHERE id = ?").run(now, id);
   }
 
-  const user = db
+  const user = (await db
     .prepare("SELECT id, name, login, role, onboarded, created_at, last_active_at FROM users WHERE id = ?")
-    .get(session.user_id) as User | undefined;
+    .get(session.user_id)) as User | undefined;
   return user ?? null;
 });
 
@@ -104,8 +104,8 @@ export async function getToday(): Promise<string> {
   return todayIn(await getTz());
 }
 
-export function touchActivity(userId: number) {
-  db.prepare("UPDATE users SET last_active_at = datetime('now') WHERE id = ?").run(userId);
+export async function touchActivity(userId: number) {
+  await db.prepare("UPDATE users SET last_active_at = datetime('now') WHERE id = ?").run(userId);
 }
 
 // Простая защита от перебора паролей (в памяти процесса)
@@ -121,9 +121,9 @@ export function rateLimit(key: string, max = 8, windowMs = 15 * 60 * 1000): bool
   return rec.count <= max;
 }
 
-export function createResetToken(userId: number, hours = 24): string {
+export async function createResetToken(userId: number, hours = 24): Promise<string> {
   const token = crypto.randomBytes(32).toString("base64url");
-  db.prepare("INSERT INTO password_resets (token_hash, user_id, expires_at) VALUES (?, ?, ?)").run(
+  await db.prepare("INSERT INTO password_resets (token_hash, user_id, expires_at) VALUES (?, ?, ?)").run(
     sha256(token),
     userId,
     Date.now() + hours * 3600 * 1000,

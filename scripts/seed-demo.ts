@@ -1,7 +1,12 @@
 // Демо-данные для просмотра: npm run seed-demo
 // Админ: admin@demo.ru / demo12345 · Клиенты: anna@demo.ru, maria@demo.ru, ivan@demo.ru / demo12345
 import bcrypt from "bcryptjs";
-import { db } from "../src/lib/db.ts";
+
+if (process.env.TURSO_DATABASE_URL) {
+  console.error("Демо-данные заливаются только в локальную базу. Уберите TURSO_DATABASE_URL из окружения.");
+  process.exit(1);
+}
+import { db, deleteUserData } from "../src/lib/db.ts";
 import { addDays, todayIn } from "../src/lib/dates.ts";
 
 const hash = bcrypt.hashSync("demo12345", 10);
@@ -10,12 +15,14 @@ let seed = 7;
 const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
 const pick = <T,>(a: T[]) => a[Math.floor(rnd() * a.length)];
 
-db.prepare(
-  `INSERT INTO users (name, login, password_hash, role, onboarded, consent_at) VALUES ('Денис', 'admin@demo.ru', ?, 'admin', 1, datetime('now'))
-   ON CONFLICT (login) DO NOTHING`,
-).run(hash);
+await db
+  .prepare(
+    `INSERT INTO users (name, login, password_hash, role, onboarded, consent_at) VALUES ('Денис', 'admin@demo.ru', ?, 'admin', 1, datetime('now'))
+     ON CONFLICT (login) DO NOTHING`,
+  )
+  .run(hash);
 
-const moods = db.prepare("SELECT id, zone FROM moods").all() as { id: number; zone: number }[];
+const moods = (await db.prepare("SELECT id, zone FROM moods").all()) as { id: number; zone: number }[];
 const MAIN = ["Сегодня я впервые сходил(а) на йогу", "Закончил(а) большой рабочий проект", "Позвонил(а) маме и долго разговаривали", "Сегодня для меня было важно выспаться", "Разобрал(а) завалы на столе"];
 const GRAT = ["За то, что не стал(а) ругать себя за ошибку", "За то, что вовремя легла спать", "За то, что попросил(а) о помощи", "За прогулку, хотя было лень"];
 
@@ -26,23 +33,26 @@ const clients = [
 ];
 
 for (const c of clients) {
-  const existing = db.prepare("SELECT id FROM users WHERE login = ?").get(c.login) as { id: number } | undefined;
-  if (existing) db.prepare("DELETE FROM users WHERE id = ?").run(existing.id);
+  const existing = (await db.prepare("SELECT id FROM users WHERE login = ?").get(c.login)) as { id: number } | undefined;
+  if (existing) await deleteUserData(existing.id);
   const start = addDays(today, -c.days);
   const uid = Number(
-    db
+    (await db
       .prepare(
         `INSERT INTO users (name, login, password_hash, onboarded, consent_at, created_at, last_active_at)
          VALUES (?, ?, ?, 1, datetime('now'), datetime('now', ?), datetime('now', ?))`,
       )
-      .run(c.name, c.login, hash, `-${c.days} days`, `-${c.lastAgo} days`).lastInsertRowid,
+      .run(c.name, c.login, hash, `-${c.days} days`, `-${c.lastAgo} days`)).lastInsertRowid,
   );
-  const habitIds = ["Выпить воду утром", "Зарядка", "Прогулка 30 минут", "Читать 20 минут"].map((t, i) =>
-    Number(db.prepare("INSERT INTO habits (user_id, title, position, created_at) VALUES (?, ?, ?, ?)").run(uid, t, i, start).lastInsertRowid),
-  );
-  const mark = db.prepare("INSERT INTO marks (user_id, tracker, date, level, mood_id) VALUES (?, ?, ?, ?, ?)");
-  const entry = db.prepare("INSERT INTO entries (user_id, kind, date, text) VALUES (?, ?, ?, ?)");
-  const check = db.prepare("INSERT INTO habit_checks (habit_id, date) VALUES (?, ?)");
+  const habitIds: number[] = [];
+  for (const [i, t] of ["Выпить воду утром", "Зарядка", "Прогулка 30 минут", "Читать 20 минут"].entries()) {
+    habitIds.push((await db.prepare("INSERT INTO habits (user_id, title, position, created_at) VALUES (?, ?, ?, ?)").run(uid, t, i, start)).lastInsertRowid);
+  }
+  // все вставки клиента — одним пакетом
+  const batch: [string, ...(string | number | null)[]][] = [];
+  const mark = { run: (...a: (string | number | null)[]) => batch.push(["INSERT INTO marks (user_id, tracker, date, level, mood_id) VALUES (?, ?, ?, ?, ?)", ...a]) };
+  const entry = { run: (...a: (string | number)[]) => batch.push(["INSERT INTO entries (user_id, kind, date, text) VALUES (?, ?, ?, ?)", ...a]) };
+  const check = { run: (...a: (string | number)[]) => batch.push(["INSERT INTO habit_checks (habit_id, date) VALUES (?, ?)", ...a]) };
   for (let d = start; d <= addDays(today, -c.lastAgo); d = addDays(d, 1)) {
     if (rnd() > c.fill) continue;
     const base = 1 + Math.floor(rnd() * rnd() * 4);
@@ -55,7 +65,8 @@ for (const c of clients) {
     if (rnd() < 0.5) entry.run(uid, "gratitude", d, pick(GRAT));
   }
   if (c.name === "Анна") {
-    db.prepare("INSERT INTO assignments (user_id, text) VALUES (?, ?)").run(uid, "Домашнее задание на эту неделю: отмечать тревожность каждый вечер.");
+    batch.push(["INSERT INTO assignments (user_id, text) VALUES (?, ?)", uid, "Домашнее задание на эту неделю: отмечать тревожность каждый вечер."]);
   }
+  await db.batch(batch);
 }
 console.log("Демо-данные созданы. Админ: admin@demo.ru / demo12345");

@@ -6,7 +6,7 @@ import { PageTitle } from "@/components/Shell";
 export default async function HabitsPage() {
   const user = await requireClient();
   const today = await getToday();
-  const habits = getHabitsInRange(user.id, "2000-01-01", today);
+  const habits = await getHabitsInRange(user.id, "2000-01-01", today);
   return (
     <div className="mx-auto max-w-2xl">
       <PageTitle eyebrow="маленькие шаги" title="Полезные привычки">
@@ -15,7 +15,7 @@ export default async function HabitsPage() {
       <HabitsView
         today={today}
         habits={habits.map(({ id, title, created_at, archived_at }) => ({ id, title, created_at, archived_at }))}
-        initialChecks={getHabitChecks(user.id, "2000-01-01", today)}
+        initialChecks={await getHabitChecks(user.id, "2000-01-01", today)}
       />
     </div>
   );

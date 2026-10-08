@@ -19,8 +19,8 @@ export default async function Dashboard() {
   if (!user.onboarded) redirect("/app/welcome");
   const tz = await getTz();
   const today = todayIn(tz);
-  const s = getDayStatus(user.id, today);
-  const assignments = getAssignments(user.id);
+  const s = await getDayStatus(user.id, today);
+  const assignments = await getAssignments(user.id);
 
   const rows: { key: (typeof TRACKERS)[number]["key"]; done: boolean; text: string }[] = [
     { key: "rating", done: s.rating, text: s.rating ? "заполнен" : "не заполнен" },

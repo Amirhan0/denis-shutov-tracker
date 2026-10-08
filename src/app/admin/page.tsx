@@ -9,13 +9,14 @@ export default async function AdminHome({ searchParams }: PageProps<"/admin">) {
   const tz = await getTz();
   const today = todayIn(tz);
   const q = String((await searchParams).q ?? "").trim().toLowerCase();
-  const rows = getClients()
-    .filter((c) => !q || c.name.toLowerCase().includes(q) || c.login.includes(q))
-    .map((c) => {
+  const clients = (await getClients()).filter((c) => !q || c.name.toLowerCase().includes(q) || c.login.includes(q));
+  const rows = await Promise.all(
+    clients.map(async (c) => {
       const last = utcToLocalDate(c.last_active_at, tz);
-      const pct = fillPercent(c, today, tz);
+      const pct = await fillPercent(c, today, tz);
       return { ...c, last, pct, status: clientStatus(last, utcToLocalDate(c.created_at, tz), pct, today) };
-    });
+    }),
+  );
   const attention = rows.filter((r) => r.status.tone === "warn").length;
 
   return (

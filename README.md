@@ -1,12 +1,12 @@
 # Денис Шутов | Психолог — платформа с трекерами
 
-Next.js 16 + SQLite (better-sqlite3). Один процесс, одна база-файл, без внешних сервисов.
+Next.js 16 + SQLite через libSQL: в продакшене база в [Turso](https://turso.tech), локально — файл `./data/app.db`.
 
 ## Быстрый старт
 
 ```bash
 npm install
-npm run seed-demo      # демо: admin@demo.ru / demo12345, клиенты anna@ / maria@ / ivan@demo.ru
+npm run seed-demo      # демо только в локальный файл: admin@demo.ru / demo12345, клиенты anna@ / maria@ / ivan@demo.ru
 npm run dev            # http://localhost:3000
 ```
 
@@ -28,16 +28,27 @@ npm run dev            # http://localhost:3000
 
 «Задания от психолога» уже работают: Денис пишет задание в карточке клиента — клиент видит его на главной кабинета.
 
-## Запуск в продакшене
+## Запуск на Vercel
+
+1. Vercel → **Add New → Project** → импортировать репозиторий с GitHub.
+2. **Settings → Environment Variables**: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `APP_URL`, `NEXT_PUBLIC_INSTAGRAM_URL`, `NEXT_PUBLIC_TELEGRAM_URL`, `NEXT_PUBLIC_CONTACT_EMAIL` (по желанию — `SMTP_*`).
+3. **Settings → Functions → Function Region**: тот же регион, что у базы Turso (например, Frankfurt `fra1`). Иначе каждый запрос к базе будет медленнее.
+4. Создать аккаунт Дениса (берёт ключи Turso из `.env.local`):
+   ```bash
+   npm run create-admin -- denis@mail.ru 'надёжный-пароль' 'Денис'
+   ```
+
+Таблицы в базе создаются автоматически при первом запросе.
+
+## Запуск на своём сервере (VPS)
 
 ```bash
-cp .env.example .env.production   # заполнить
 npm ci && npm run build
 npm run create-admin -- denis@mail.ru 'надёжный-пароль' 'Денис'
 npm start                          # порт 3000, держать через pm2 / systemd
 ```
 
-HTTPS: поставить перед приложением Caddy (сертификат выпускается автоматически):
+HTTPS — через Caddy:
 
 ```
 shutov-psy.ru {
@@ -45,7 +56,7 @@ shutov-psy.ru {
 }
 ```
 
-Нужен обычный VPS с диском: SQLite хранится в файле, поэтому Vercel и другие serverless-хостинги не подходят.
+Без `TURSO_*` данные хранятся в файле `./data/app.db` на сервере.
 
 ## Безопасность данных
 
@@ -54,7 +65,7 @@ shutov-psy.ru {
 - роли `client` и `admin`: все запросы клиента фильтруются по его `user_id` из сессии, админка проверяет роль на сервере;
 - автовыход после `SESSION_IDLE_MINUTES` бездействия (и на сервере, и в браузере);
 - ограничение попыток входа, согласие с политикой при регистрации;
-- резервные копии: `npm run backup` (хранит 30 последних в `./backups`), в cron: `0 3 * * * cd /srv/tracker && npm run backup`.
+- резервные копии: Turso хранит свои и умеет восстанавливать базу на нужный момент; дополнительно `npm run backup` выгружает все данные в JSON (30 последних в `./backups`).
 
 ## Что заменить перед запуском
 

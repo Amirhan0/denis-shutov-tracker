@@ -14,7 +14,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/app/stats"
   const end = addDays(from, 6);
   const to = end > today ? today : end;
   const isCurrent = from === thisWeek;
-  const s = computeStats(user.id, from, to, isCurrent ? "На этой неделе" : "На той неделе");
+  const s = await computeStats(user.id, from, to, isCurrent ? "На этой неделе" : "На той неделе");
 
   return (
     <div>

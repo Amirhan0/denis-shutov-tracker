@@ -38,11 +38,11 @@ export async function register(_: FormState, fd: FormData): Promise<FormState> {
   if (fd.get("consent") !== "on") return { error: "Нужно согласие с политикой конфиденциальности" };
   if (!rateLimit("register:" + (await clientIp()), 10, 60 * 60 * 1000)) return { error: "Слишком много попыток, попробуйте позже" };
 
-  const exists = db.prepare("SELECT 1 FROM users WHERE login = ?").get(login);
+  const exists = await db.prepare("SELECT 1 FROM users WHERE login = ?").get(login);
   if (exists) return { error: "Такой аккаунт уже есть — попробуйте войти" };
 
   const hash = await bcrypt.hash(password, 12);
-  const { lastInsertRowid } = db
+  const { lastInsertRowid } = await db
     .prepare("INSERT INTO users (name, login, password_hash, consent_at, last_active_at) VALUES (?, ?, ?, datetime('now'), datetime('now'))")
     .run(name.slice(0, 60), login, hash);
   await createSession(Number(lastInsertRowid));
@@ -55,7 +55,7 @@ export async function login(_: FormState, fd: FormData): Promise<FormState> {
   if (!rateLimit("login:" + login) || !rateLimit("login-ip:" + (await clientIp()), 30)) {
     return { error: "Слишком много попыток. Подождите 15 минут." };
   }
-  const user = db.prepare("SELECT id, password_hash, role FROM users WHERE login = ?").get(login) as
+  const user = await db.prepare("SELECT id, password_hash, role FROM users WHERE login = ?").get(login) as
     | { id: number; password_hash: string; role: string }
     | undefined;
   // сравниваем и для несуществующего пользователя, чтобы время ответа не выдавало наличие аккаунта
@@ -83,9 +83,9 @@ export async function requestReset(_: FormState, fd: FormData): Promise<FormStat
   };
   if (!rateLimit("reset:" + (await clientIp()), 5)) return { error: "Слишком много попыток, попробуйте позже" };
 
-  const user = db.prepare("SELECT id, name FROM users WHERE login = ?").get(login) as { id: number; name: string } | undefined;
+  const user = await db.prepare("SELECT id, name FROM users WHERE login = ?").get(login) as { id: number; name: string } | undefined;
   if (user && login.includes("@")) {
-    const token = createResetToken(user.id);
+    const token = await createResetToken(user.id);
     const link = `${await appUrl()}/reset/${token}`;
     await sendMail(
       login,
@@ -101,17 +101,17 @@ export async function resetPassword(_: FormState, fd: FormData): Promise<FormSta
   const password = String(fd.get("password") ?? "");
   if (password.length < MIN_PASSWORD) return { error: `Пароль — минимум ${MIN_PASSWORD} символов` };
 
-  const row = db.prepare("SELECT user_id, expires_at, used FROM password_resets WHERE token_hash = ?").get(sha256(token)) as
+  const row = await db.prepare("SELECT user_id, expires_at, used FROM password_resets WHERE token_hash = ?").get(sha256(token)) as
     | { user_id: number; expires_at: number; used: number }
     | undefined;
   if (!row || row.used || row.expires_at < Date.now()) return { error: "Ссылка устарела. Запросите новую." };
 
   const hash = await bcrypt.hash(password, 12);
-  db.transaction(() => {
-    db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(hash, row.user_id);
-    db.prepare("UPDATE password_resets SET used = 1 WHERE user_id = ?").run(row.user_id);
-    db.prepare("DELETE FROM sessions WHERE user_id = ?").run(row.user_id);
-  })();
+  await db.batch([
+    ["UPDATE users SET password_hash = ? WHERE id = ?", hash, row.user_id],
+    ["UPDATE password_resets SET used = 1 WHERE user_id = ?", row.user_id],
+    ["DELETE FROM sessions WHERE user_id = ?", row.user_id],
+  ]);
   redirect("/login?reset=1");
 }
 
@@ -120,8 +120,8 @@ export async function changePassword(_: FormState, fd: FormData): Promise<FormSt
   const current = String(fd.get("current") ?? "");
   const next = String(fd.get("password") ?? "");
   if (next.length < MIN_PASSWORD) return { error: `Новый пароль — минимум ${MIN_PASSWORD} символов` };
-  const row = db.prepare("SELECT password_hash FROM users WHERE id = ?").get(user.id) as { password_hash: string };
+  const row = (await db.prepare("SELECT password_hash FROM users WHERE id = ?").get(user.id)) as { password_hash: string };
   if (!(await bcrypt.compare(current, row.password_hash))) return { error: "Текущий пароль указан неверно" };
-  db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(await bcrypt.hash(next, 12), user.id);
+  await db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(await bcrypt.hash(next, 12), user.id);
   return { ok: "Пароль изменён" };
 }

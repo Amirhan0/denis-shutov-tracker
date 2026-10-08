@@ -22,22 +22,22 @@ export function utcToLocalDate(utc: string | null, tz: string): string | null {
   }
 }
 
-export function getClients(): ClientRow[] {
-  return db
+export async function getClients(): Promise<ClientRow[]> {
+  return (await db
     .prepare("SELECT id, name, login, created_at, last_active_at FROM users WHERE role = 'client' ORDER BY last_active_at DESC NULLS LAST, id DESC")
-    .all() as ClientRow[];
+    .all()) as ClientRow[];
 }
 
-export function getClient(id: number): ClientRow | undefined {
-  return db.prepare("SELECT id, name, login, created_at, last_active_at FROM users WHERE id = ? AND role = 'client'").get(id) as ClientRow | undefined;
+export async function getClient(id: number): Promise<ClientRow | undefined> {
+  return (await db.prepare("SELECT id, name, login, created_at, last_active_at FROM users WHERE id = ? AND role = 'client'").get(id)) as ClientRow | undefined;
 }
 
 /** Процент заполнения за последние 7 дней (6 трекеров в день) */
-export function fillPercent(c: ClientRow, today: string, tz: string): number {
+export async function fillPercent(c: ClientRow, today: string, tz: string): Promise<number> {
   const registered = utcToLocalDate(c.created_at, tz) ?? today;
   const from = registered > addDays(today, -6) ? registered : addDays(today, -6);
   const days = diffDays(from, today) + 1;
-  const filled = getFilledDates(c.id, from, today);
+  const filled = await getFilledDates(c.id, from, today);
   let sum = 0;
   for (const n of filled.values()) sum += Math.min(n, 6);
   return Math.round((sum / (days * 6)) * 100);

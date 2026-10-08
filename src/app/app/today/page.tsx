@@ -10,8 +10,8 @@ export default async function TodayPage({ searchParams }: PageProps<"/app/today"
   const sp = await searchParams;
   const date = isISODate(sp.date) && sp.date <= today ? sp.date : today;
 
-  const habits = getHabitsInRange(user.id, date, date).filter((h) => habitActiveOn(h, date));
-  const checks = getHabitChecks(user.id, date, date);
+  const habits = (await getHabitsInRange(user.id, date, date)).filter((h) => habitActiveOn(h, date));
+  const checks = await getHabitChecks(user.id, date, date);
 
   return (
     <div className="mx-auto max-w-xl">
@@ -23,14 +23,14 @@ export default async function TodayPage({ searchParams }: PageProps<"/app/today"
         date={date}
         today={today}
         marks={{
-          rating: getMarks(user.id, "rating", date, date)[date],
-          anxiety: getMarks(user.id, "anxiety", date, date)[date],
-          mood: getMarks(user.id, "mood", date, date)[date],
+          rating: (await getMarks(user.id, "rating", date, date))[date],
+          anxiety: (await getMarks(user.id, "anxiety", date, date))[date],
+          mood: (await getMarks(user.id, "mood", date, date))[date],
         }}
-        moods={getMoods(true)}
+        moods={await getMoods(true)}
         habits={habits.map((h) => ({ id: h.id, title: h.title }))}
         checked={habits.filter((h) => checks[h.id]).map((h) => h.id)}
-        entries={{ main: getEntry(user.id, "main", date), gratitude: getEntry(user.id, "gratitude", date) }}
+        entries={{ main: await getEntry(user.id, "main", date), gratitude: await getEntry(user.id, "gratitude", date) }}
       />
     </div>
   );

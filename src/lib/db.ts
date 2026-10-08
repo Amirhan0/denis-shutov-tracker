@@ -1,9 +1,11 @@
 import "server-only";
-import Database from "better-sqlite3";
+import { createClient, type InValue } from "@libsql/client";
 import fs from "node:fs";
 import path from "node:path";
 
-const DB_PATH = process.env.DATABASE_PATH || path.join(process.cwd(), "data", "app.db");
+// В продакшене — Turso (TURSO_DATABASE_URL + TURSO_AUTH_TOKEN), локально — файл ./data/app.db
+const LOCAL_PATH = process.env.DATABASE_PATH || path.join(process.cwd(), "data", "app.db");
+const URL = process.env.TURSO_DATABASE_URL || "file:" + LOCAL_PATH;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -109,22 +111,74 @@ const DEFAULT_MOODS: [string, number][] = [
   ["Отчаяние", 4],
 ];
 
-function open() {
-  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-  const db = new Database(DB_PATH);
-  db.pragma("journal_mode = WAL");
-  db.pragma("foreign_keys = ON");
-  db.exec(SCHEMA);
+const client = createClient({ url: URL, authToken: process.env.TURSO_AUTH_TOKEN });
 
-  const { n } = db.prepare("SELECT COUNT(*) AS n FROM moods").get() as { n: number };
-  if (n === 0) {
-    const insert = db.prepare("INSERT INTO moods (label, zone, position) VALUES (?, ?, ?)");
-    DEFAULT_MOODS.forEach(([label, zone], i) => insert.run(label, zone, i));
-  }
-  return db;
+const globalForDb = globalThis as unknown as { __dbReady?: Promise<void> };
+
+function ready() {
+  globalForDb.__dbReady ??= (async () => {
+    if (URL.startsWith("file:")) fs.mkdirSync(path.dirname(LOCAL_PATH), { recursive: true });
+    await client.executeMultiple(SCHEMA);
+    const rs = await client.execute("SELECT COUNT(*) AS n FROM moods");
+    if (Number(rs.rows[0][0]) === 0) {
+      await client.batch(
+        DEFAULT_MOODS.map(([label, zone], i) => ({ sql: "INSERT INTO moods (label, zone, position) VALUES (?, ?, ?)", args: [label, zone, i] })),
+        "write",
+      );
+    }
+  })().catch((e) => {
+    globalForDb.__dbReady = undefined;
+    throw e;
+  });
+  return globalForDb.__dbReady;
 }
 
-const globalForDb = globalThis as unknown as { __db?: Database.Database };
+type Arg = InValue | boolean | undefined;
+const norm = (args: Arg[]): InValue[] => args.map((a) => (a === undefined ? null : typeof a === "boolean" ? Number(a) : a));
 
-export const db = globalForDb.__db ?? open();
-if (process.env.NODE_ENV !== "production") globalForDb.__db = db;
+async function exec(sql: string, args: Arg[]) {
+  await ready();
+  const rs = await client.execute({ sql, args: norm(args) });
+  const rows = rs.rows.map((row) => {
+    const o: Record<string, unknown> = {};
+    rs.columns.forEach((c, i) => (o[c] = row[i]));
+    return o;
+  });
+  return { rows, lastInsertRowid: Number(rs.lastInsertRowid ?? 0), changes: rs.rowsAffected };
+}
+
+/** Тонкая обёртка в стиле better-sqlite3, но асинхронная */
+export const db = {
+  prepare(sql: string) {
+    return {
+      get: async (...args: Arg[]) => (await exec(sql, args)).rows[0] as unknown,
+      all: async (...args: Arg[]) => (await exec(sql, args)).rows as unknown[],
+      run: async (...args: Arg[]) => {
+        const r = await exec(sql, args);
+        return { lastInsertRowid: r.lastInsertRowid, changes: r.changes };
+      },
+    };
+  },
+  /** Несколько изменений одной транзакцией */
+  async batch(statements: [string, ...Arg[]][]) {
+    await ready();
+    await client.batch(
+      statements.map(([sql, ...args]) => ({ sql, args: norm(args) })),
+      "write",
+    );
+  },
+};
+
+/** Полное удаление пользователя со всеми данными */
+export async function deleteUserData(userId: number) {
+  await db.batch([
+    ["DELETE FROM habit_checks WHERE habit_id IN (SELECT id FROM habits WHERE user_id = ?)", userId],
+    ["DELETE FROM habits WHERE user_id = ?", userId],
+    ["DELETE FROM marks WHERE user_id = ?", userId],
+    ["DELETE FROM entries WHERE user_id = ?", userId],
+    ["DELETE FROM assignments WHERE user_id = ?", userId],
+    ["DELETE FROM sessions WHERE user_id = ?", userId],
+    ["DELETE FROM password_resets WHERE user_id = ?", userId],
+    ["DELETE FROM users WHERE id = ?", userId],
+  ]);
+}
