@@ -1,6 +1,6 @@
 # Денис Шутов | Психолог — платформа с трекерами
 
-Next.js 16 + SQLite через libSQL: в продакшене база в [Turso](https://turso.tech), локально — файл `./data/app.db`.
+Next.js 16 + SQLite (libSQL). База — файл `./data/app.db` (на сервере — `/srv/denis/shared/data/app.db`). Умеет работать и с [Turso](https://turso.tech) через `TURSO_*`.
 
 ## Быстрый старт
 
@@ -28,35 +28,33 @@ npm run dev            # http://localhost:3000
 
 «Задания от психолога» уже работают: Денис пишет задание в карточке клиента — клиент видит его на главной кабинета.
 
-## Запуск на Vercel
+## Продакшен: denis-shutov.com (VPS PS.kz)
 
-1. Vercel → **Add New → Project** → импортировать репозиторий с GitHub.
-2. **Settings → Environment Variables**: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `APP_URL`, `NEXT_PUBLIC_INSTAGRAM_URL`, `NEXT_PUBLIC_TELEGRAM_URL`, `NEXT_PUBLIC_CONTACT_EMAIL` (по желанию — `SMTP_*`).
-3. **Settings → Functions → Function Region**: тот же регион, что у базы Turso (например, Frankfurt `fra1`). Иначе каждый запрос к базе будет медленнее.
-4. Создать аккаунт Дениса (берёт ключи Turso из `.env.local`):
-   ```bash
-   npm run create-admin -- denis@mail.ru 'надёжный-пароль' 'Денис'
-   ```
+Сервер `ubuntu@77.240.39.53`, Ubuntu 24.04. Node.js 24, Caddy (HTTPS от Let's Encrypt, продлевается сам).
 
-Таблицы в базе создаются автоматически при первом запросе.
+**Деплой автоматический:** `git push` в `main` → GitHub Actions (`.github/workflows/deploy.yml`) заходит на сервер ключом из секрета `DEPLOY_KEY` → запускается `/srv/denis/deploy.sh`. Скрипт собирает новый релиз рядом с текущим, переключает симлинк и перезапускает сервис. Если новая версия не отвечает, он откатывается на предыдущую. Этот ключ на сервере умеет только запускать деплой.
 
-## Запуск на своём сервере (VPS)
+```
+/srv/denis/
+  current -> releases/<время>   # работающая версия (хранятся 3 последних)
+  shared/.env                    # DATABASE_PATH, APP_URL
+  shared/data/app.db             # база SQLite
+  backups/                       # ночные копии базы (3:00, 30 последних)
+  deploy.sh, backup.sh
+```
+
+Полезные команды на сервере:
 
 ```bash
-npm ci && npm run build
-npm run create-admin -- denis@mail.ru 'надёжный-пароль' 'Денис'
-npm start                          # порт 3000, держать через pm2 / systemd
+sudo systemctl status denis-tracker      # состояние сайта
+journalctl -u denis-tracker -f           # логи
+/srv/denis/deploy.sh                     # деплой вручную
+cd /srv/denis/current && npm run create-admin -- почта 'пароль' 'Имя'
 ```
 
-HTTPS — через Caddy:
+Конфиги сервера лежат в `scripts/server/` (systemd-сервис, Caddyfile, бэкап).
 
-```
-shutov-psy.ru {
-  reverse_proxy localhost:3000
-}
-```
-
-Без `TURSO_*` данные хранятся в файле `./data/app.db` на сервере.
+Старый адрес `denis-shutov-tracker.vercel.app` перенаправляет на `denis-shutov.com` (`next.config.ts`, только при сборке на Vercel). Перенос данных из Turso выполнен скриптом `scripts/turso-to-file.mjs`.
 
 ## Безопасность данных
 
@@ -65,7 +63,7 @@ shutov-psy.ru {
 - роли `client` и `admin`: все запросы клиента фильтруются по его `user_id` из сессии, админка проверяет роль на сервере;
 - автовыход после `SESSION_IDLE_MINUTES` бездействия (и на сервере, и в браузере);
 - ограничение попыток входа, согласие с политикой при регистрации;
-- резервные копии: Turso хранит свои и умеет восстанавливать базу на нужный момент; дополнительно `npm run backup` выгружает все данные в JSON (30 последних в `./backups`).
+- резервные копии: каждую ночь в 3:00 на сервере (`/srv/denis/backups`, 30 последних).
 
 ## Что заменить перед запуском
 
