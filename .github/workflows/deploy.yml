@@ -21,4 +21,4 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           echo "77.240.39.53 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPUR7TJBWhT9cow6guPy4c1V29Q9FIPVVt44bmPtLrSX" > ~/.ssh/known_hosts
           # ключ на сервере ограничен одной командой — запуском /srv/denis/deploy.sh
-          ssh -i ~/.ssh/deploy_key ubuntu@77.240.39.53
+          ssh -o ServerAliveInterval=20 -o ServerAliveCountMax=45 -i ~/.ssh/deploy_key ubuntu@77.240.39.53

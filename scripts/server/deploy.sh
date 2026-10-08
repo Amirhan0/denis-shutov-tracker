@@ -2,6 +2,8 @@
 # Деплой на сервер: свежий релиз собирается рядом с текущим, затем мгновенное переключение.
 # Запускается из GitHub Actions (через ограниченный SSH-ключ) или вручную: /srv/denis/deploy.sh
 set -euo pipefail
+# обрыв SSH-соединения (долгая сборка без вывода) не должен прерывать деплой на середине
+trap "" HUP
 
 APP=/srv/denis
 REPO=https://github.com/Amirhan0/denis-shutov-tracker.git
