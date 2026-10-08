@@ -1,4 +1,6 @@
+import Image from "next/image";
 import Link from "next/link";
+import denisPhoto from "@/assets/denis.jpg";
 import { getCurrentUser } from "@/lib/auth";
 import { SITE } from "@/lib/site";
 import { LEVEL_COLOR, TRACKERS, type Level } from "@/lib/trackers";
@@ -175,9 +177,15 @@ export default async function Home() {
           <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-20 md:grid-cols-[0.8fr_1.2fr]">
             <div className="relative mx-auto w-64 md:w-full md:max-w-xs">
               <div className="paper aspect-[4/5] -rotate-2 p-3">
-                <div className="flex h-full items-center justify-center rounded-2xl bg-[#efe2cf]">
-                  {/* Замените на фото: <Image src="/denis.jpg" … /> */}
-                  <span className="font-serif text-6xl italic text-terracotta/70">ДШ</span>
+                <div className="relative h-full overflow-hidden rounded-2xl bg-[#efe2cf]">
+                  <Image
+                    src={denisPhoto}
+                    alt="Денис Шутов, психолог"
+                    fill
+                    placeholder="blur"
+                    sizes="(min-width: 768px) 320px, 256px"
+                    className="object-cover object-[50%_20%]"
+                  />
                 </div>
               </div>
               <Sprout className="absolute -right-6 -bottom-6 h-20 w-20 text-sage" />
