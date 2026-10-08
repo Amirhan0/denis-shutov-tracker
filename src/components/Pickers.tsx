@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
-import { LEVELS, LEVEL_COLOR, SCALES, type ColorTracker, type Level, type Mark, type Mood } from "@/lib/trackers";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { LEVELS, LEVEL_COLOR, MAX_MOOD_PICKS, SCALES, moodPicks, type ColorTracker, type Level, type Mark, type Mood, type MoodPick } from "@/lib/trackers";
 import { Check } from "./Doodles";
 
 /** Нижняя «шторка» на телефоне, модальное окно на десктопе */
@@ -40,7 +40,13 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
 
 export function markLabel(tracker: ColorTracker, mark: Mark | undefined, moods: Map<number, Mood>): string {
   if (!mark) return "";
-  if (tracker === "mood") return (mark.moodId ? moods.get(mark.moodId)?.label : mark.note) || SCALES.mood.labels[mark.level];
+  if (tracker === "mood")
+    return (
+      moodPicks(mark)
+        .map((p) => (p.moodId ? moods.get(p.moodId)?.label : p.note))
+        .filter(Boolean)
+        .join(", ") || SCALES.mood.labels[mark.level]
+    );
   return SCALES[tracker].labels[mark.level];
 }
 
@@ -108,7 +114,7 @@ export function LevelPicker({
   );
 }
 
-/** Выбор настроения: категории, сгруппированные по цветовым зонам, + «Другое» */
+/** Выбор настроения: можно отметить несколько (например, утром спокойствие, вечером злость) */
 export function MoodPicker({
   moods,
   value,
@@ -116,38 +122,58 @@ export function MoodPicker({
 }: {
   moods: Mood[];
   value?: Mark;
-  onChange: (mark: Mark) => void;
+  onChange: (picks: MoodPick[]) => void;
 }) {
   const active = moods.filter((m) => m.active);
-  const [other, setOther] = useState(!!value?.note);
-  const [note, setNote] = useState(value?.note ?? "");
-  const [zone, setZone] = useState<Level>(value?.note ? value.level : 2);
+  const picks = moodPicks(value);
+  // последний выбор — чтобы быстрые тапы подряд не теряли друг друга до перерисовки
+  const latest = useRef(picks);
+  latest.current = picks;
+  const emit = (next: MoodPick[]) => {
+    latest.current = next;
+    onChange(next);
+  };
+  const custom = picks.filter((p) => !p.moodId);
+  const [other, setOther] = useState(false);
+  const [note, setNote] = useState("");
+  const [zone, setZone] = useState<Level>(2);
+  const full = picks.length >= MAX_MOOD_PICKS;
+
+  function toggle(m: Mood) {
+    const cur = latest.current;
+    if (cur.some((p) => p.moodId === m.id)) emit(cur.filter((p) => p.moodId !== m.id));
+    else if (cur.length < MAX_MOOD_PICKS) emit([...cur, { moodId: m.id, level: m.zone }]);
+  }
 
   return (
     <div className="space-y-4">
+      <p className="-mt-1 text-sm text-ink-faint">Можно выбрать несколько — например, утром одно, вечером другое.</p>
       {LEVELS.map((zoneLevel) => {
         const list = active.filter((m) => m.zone === zoneLevel);
         if (!list.length) return null;
         return (
           <div key={zoneLevel} className="flex flex-wrap gap-2">
             {list.map((m) => {
-              const selected = value?.moodId === m.id;
+              const order = picks.findIndex((p) => p.moodId === m.id);
+              const selected = order >= 0;
               return (
                 <button
                   key={m.id}
                   type="button"
-                  onClick={() => {
-                    setOther(false);
-                    onChange({ level: m.zone, moodId: m.id });
-                  }}
-                  className="chip"
+                  onClick={() => toggle(m)}
+                  disabled={!selected && full}
+                  className="chip disabled:opacity-40"
                   style={
                     selected
                       ? { background: LEVEL_COLOR[m.zone], borderColor: LEVEL_COLOR[m.zone], color: "#2e2420", fontWeight: 600 }
                       : { borderColor: LEVEL_COLOR[m.zone] + "99" }
                   }
                 >
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: selected ? "#fff8" : LEVEL_COLOR[m.zone] }} />
+                  {selected ? (
+                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white/70 text-[0.65rem] font-bold">{order + 1}</span>
+                  ) : (
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: LEVEL_COLOR[m.zone] }} />
+                  )}
                   {m.label}
                 </button>
               );
@@ -156,45 +182,64 @@ export function MoodPicker({
         );
       })}
 
-      <div>
-        <button type="button" onClick={() => setOther((o) => !o)} className={`chip ${other ? "border-ink/50 bg-white" : ""}`}>
-          ✎ Другое
-        </button>
-        {other && (
-          <form
-            className="animate-fade mt-3 space-y-3 rounded-2xl bg-cream/70 p-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (note.trim()) onChange({ level: zone, note: note.trim(), moodId: null });
-            }}
+      <div className="flex flex-wrap gap-2">
+        {custom.map((p) => (
+          <button
+            key={p.note}
+            type="button"
+            onClick={() => emit(latest.current.filter((x) => x.note !== p.note || x.moodId))}
+            className="chip"
+            style={{ background: LEVEL_COLOR[p.level], borderColor: LEVEL_COLOR[p.level], color: "#2e2420", fontWeight: 600 }}
+            title="Убрать"
           >
-            <input
-              className="field"
-              placeholder="Как бы вы назвали настроение?"
-              value={note}
-              maxLength={40}
-              onChange={(e) => setNote(e.target.value)}
-              autoFocus
-            />
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-ink-soft">Цвет:</span>
-              {LEVELS.map((l) => (
-                <button
-                  key={l}
-                  type="button"
-                  onClick={() => setZone(l)}
-                  aria-label={SCALES.mood.labels[l]}
-                  className={`h-8 w-8 rounded-full border-2 transition ${zone === l ? "scale-110 border-ink/70" : "border-transparent"}`}
-                  style={{ background: LEVEL_COLOR[l] }}
-                />
-              ))}
-              <button className="btn btn-primary btn-sm ml-auto" disabled={!note.trim()}>
-                Готово
-              </button>
-            </div>
-          </form>
+            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white/70 text-[0.65rem] font-bold">{picks.indexOf(p) + 1}</span>
+            {p.note} ✕
+          </button>
+        ))}
+        {!full && (
+          <button type="button" onClick={() => setOther((o) => !o)} className={`chip ${other ? "border-ink/50 bg-white" : ""}`}>
+            ✎ Другое
+          </button>
         )}
       </div>
+      {other && !full && (
+        <form
+          className="animate-fade space-y-3 rounded-2xl bg-cream/70 p-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const t = note.trim();
+            if (!t) return;
+            emit([...latest.current, { note: t, level: zone, moodId: null }]);
+            setNote("");
+            setOther(false);
+          }}
+        >
+          <input
+            className="field"
+            placeholder="Как бы вы назвали настроение?"
+            value={note}
+            maxLength={40}
+            onChange={(e) => setNote(e.target.value)}
+            autoFocus
+          />
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-ink-soft">Цвет:</span>
+            {LEVELS.map((l) => (
+              <button
+                key={l}
+                type="button"
+                onClick={() => setZone(l)}
+                aria-label={SCALES.mood.labels[l]}
+                className={`h-8 w-8 rounded-full border-2 transition ${zone === l ? "scale-110 border-ink/70" : "border-transparent"}`}
+                style={{ background: LEVEL_COLOR[l] }}
+              />
+            ))}
+            <button className="btn btn-primary btn-sm ml-auto" disabled={!note.trim()}>
+              Добавить
+            </button>
+          </div>
+        </form>
+      )}
     </div>
   );
 }

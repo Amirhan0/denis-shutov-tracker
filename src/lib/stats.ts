@@ -1,7 +1,7 @@
 import "server-only";
 import { addDays, diffDays, range } from "./dates";
 import { getEntries, getFilledDates, getHabitChecks, getHabitsInRange, getMarks, getMoods, habitActiveOn } from "./data";
-import { LEVELS, type Level, type Mark } from "./trackers";
+import { LEVELS, moodPicks, type Level, type Mark } from "./trackers";
 
 // Статистика — описательная, не диагностическая.
 
@@ -96,12 +96,16 @@ export async function computeStats(userId: number, from: string, to: string, per
 
   // Настроение
   const moodMarks = await getMarks(userId, "mood", from, to);
-  const mc = countLevels(moodMarks);
+  // за день может быть несколько настроений — считаем каждое
+  const mc: LevelCounts = { 1: 0, 2: 0, 3: 0, 4: 0 };
   const moods = new Map((await getMoods(true)).map((m) => [m.id, m.label]));
   const freq = new Map<string, { count: number; zone: Level }>();
   for (const m of Object.values(moodMarks)) {
-    const label = m.moodId ? moods.get(m.moodId) : m.note;
-    if (label) freq.set(label, { count: (freq.get(label)?.count ?? 0) + 1, zone: m.level });
+    for (const p of moodPicks(m)) {
+      mc[p.level]++;
+      const label = p.moodId ? moods.get(p.moodId) : p.note;
+      if (label) freq.set(label, { count: (freq.get(label)?.count ?? 0) + 1, zone: p.level });
+    }
   }
   const sorted = [...freq.entries()].sort((a, b) => b[1].count - a[1].count);
   const top = sorted.slice(0, 3).map(([label, v]) => ({ label, count: v.count }));

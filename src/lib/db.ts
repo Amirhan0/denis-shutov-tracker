@@ -119,6 +119,11 @@ function ready() {
   globalForDb.__dbReady ??= (async () => {
     if (URL.startsWith("file:")) fs.mkdirSync(path.dirname(LOCAL_PATH), { recursive: true });
     await client.executeMultiple(SCHEMA);
+    // миграция: несколько настроений за день
+    const markCols = await client.execute("PRAGMA table_info(marks)");
+    if (!markCols.rows.some((r) => r[1] === "picks")) {
+      await client.execute("ALTER TABLE marks ADD COLUMN picks TEXT");
+    }
     // миграция: флаг «запомнить меня» у сессий
     const cols = await client.execute("PRAGMA table_info(sessions)");
     if (!cols.rows.some((r) => r[1] === "remember")) {

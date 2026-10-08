@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 import { getToday, requireClient, touchActivity } from "@/lib/auth";
 import { addDays, isISODate } from "@/lib/dates";
 import { getActiveHabits } from "@/lib/data";
-import { MAX_HABITS, type ColorTracker, type EntryKind } from "@/lib/trackers";
+import { MAX_HABITS, MAX_MOOD_PICKS, type ColorTracker, type EntryKind, type Level, type MoodPick } from "@/lib/trackers";
 
 async function checkDate(date: string) {
   // +1 день запаса на разницу часовых поясов
@@ -39,6 +39,47 @@ export async function setMark(tracker: ColorTracker, date: string, level: number
        ON CONFLICT (user_id, tracker, date) DO UPDATE SET level = excluded.level, mood_id = excluded.mood_id,
        note = excluded.note, updated_at = datetime('now')`,
     ).run(user.id, tracker, date, level, mood, text);
+  }
+  await touchActivity(user.id);
+}
+
+/** Настроение за день: несколько вариантов в порядке выбора. Пустой список — очистить отметку */
+export async function setMoods(date: string, picks: { moodId?: number | null; note?: string | null; level?: number }[]) {
+  const user = await requireClient();
+  await checkDate(date);
+
+  const zones = new Map(
+    ((await db.prepare("SELECT id, zone FROM moods").all()) as { id: number; zone: Level }[]).map((m) => [m.id, m.zone]),
+  );
+  const clean: MoodPick[] = [];
+  const seen = new Set<string>();
+  for (const p of picks.slice(0, MAX_MOOD_PICKS)) {
+    if (p.moodId) {
+      const zone = zones.get(Number(p.moodId));
+      if (!zone || seen.has("m" + p.moodId)) continue;
+      seen.add("m" + p.moodId);
+      clean.push({ moodId: Number(p.moodId), level: zone });
+    } else {
+      const note = String(p.note ?? "").trim().slice(0, 40);
+      const level = Number(p.level);
+      if (!note || ![1, 2, 3, 4].includes(level) || seen.has("n" + note.toLowerCase())) continue;
+      seen.add("n" + note.toLowerCase());
+      clean.push({ note, level: level as Level });
+    }
+  }
+
+  if (!clean.length) {
+    await db.prepare("DELETE FROM marks WHERE user_id = ? AND tracker = 'mood' AND date = ?").run(user.id, date);
+  } else {
+    // цвет дня для совместимости — самая интенсивная зона
+    const level = Math.max(...clean.map((p) => p.level));
+    await db
+      .prepare(
+        `INSERT INTO marks (user_id, tracker, date, level, mood_id, note, picks) VALUES (?, 'mood', ?, ?, ?, ?, ?)
+         ON CONFLICT (user_id, tracker, date) DO UPDATE SET level = excluded.level, mood_id = excluded.mood_id,
+         note = excluded.note, picks = excluded.picks, updated_at = datetime('now')`,
+      )
+      .run(user.id, date, level, clean[0].moodId ?? null, clean[0].note ?? null, JSON.stringify(clean));
   }
   await touchActivity(user.id);
 }

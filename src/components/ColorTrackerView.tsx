@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { setMark } from "@/app/actions/trackers";
+import { setMark, setMoods } from "@/app/actions/trackers";
+import { enqueue } from "@/lib/queue";
 import { MONTHS, MONTHS_SHORT, WEEKDAYS_SHORT, daysInMonth, formatDayLong, parts, toISO, weekdayIndex } from "@/lib/dates";
-import { LEVEL_COLOR, SCALES, type ColorTracker, type Level, type Mark, type Mood } from "@/lib/trackers";
+import { SCALES, markBackground, markFromPicks, moodPicks, type ColorTracker, type Mark, type Mood } from "@/lib/trackers";
 import { Legend, LevelPicker, MoodPicker, Sheet, markLabel } from "./Pickers";
 
 type Props = {
@@ -23,7 +24,7 @@ export function ColorTrackerView({ tracker, today, initialMarks, moods = [] }: P
   const [, startTransition] = useTransition();
   const moodMap = useMemo(() => new Map(moods.map((m) => [m.id, m])), [moods]);
 
-  function save(date: string, mark: Mark | null) {
+  function save(date: string, mark: Mark | null, keepOpen = false) {
     const prev = marks[date];
     setMarks((all) => {
       const next = { ...all };
@@ -31,11 +32,12 @@ export function ColorTrackerView({ tracker, today, initialMarks, moods = [] }: P
       else delete next[date];
       return next;
     });
-    setTimeout(() => setSelected(null), 160);
+    if (!keepOpen) setTimeout(() => setSelected(null), 160);
     setError(null);
     startTransition(async () => {
       try {
-        await setMark(tracker, date, mark?.level ?? null, mark?.moodId ?? null, mark?.note ?? null);
+        if (tracker === "mood") await enqueue(() => setMoods(date, moodPicks(mark ?? undefined)));
+        else await setMark(tracker, date, mark?.level ?? null, mark?.moodId ?? null, mark?.note ?? null);
       } catch {
         setMarks((all) => {
           const next = { ...all };
@@ -135,7 +137,12 @@ export function ColorTrackerView({ tracker, today, initialMarks, moods = [] }: P
         {selected && (
           <div key={selected}>
             {tracker === "mood" ? (
-              <MoodPicker moods={moods} value={marks[selected]} onChange={(m) => save(selected, m)} />
+              <>
+                <MoodPicker moods={moods} value={marks[selected]} onChange={(picks) => save(selected, markFromPicks(picks), true)} />
+                <button onClick={() => setSelected(null)} className="btn btn-primary mt-5 w-full">
+                  Готово
+                </button>
+              </>
             ) : (
               <LevelPicker tracker={tracker} value={marks[selected]?.level} onChange={(l) => save(selected, { level: l })} />
             )}
@@ -196,7 +203,7 @@ function MonthGrid({
               className={`relative flex aspect-square flex-col items-center justify-center rounded-xl text-sm font-semibold transition sm:rounded-2xl ${
                 mark ? "text-[#2e2420] shadow-[inset_0_-2px_0_rgba(0,0,0,0.08)]" : "border-[1.5px] border-dashed border-line text-ink-soft hover:border-ink-faint"
               } ${future ? "opacity-35" : "active:scale-95"} ${isToday ? "ring-2 ring-ink/70 ring-offset-2 ring-offset-paper" : ""}`}
-              style={mark ? { background: LEVEL_COLOR[mark.level] } : undefined}
+              style={mark ? { background: markBackground(mark) } : undefined}
             >
               {i + 1}
               {showLabels && mark && (
@@ -249,7 +256,7 @@ function YearGrid({
                   className={`h-5 rounded-[5px] sm:h-6 ${mark ? "" : "border border-line"} ${future ? "opacity-40" : "hover:opacity-80"} ${
                     d === today ? "ring-[1.5px] ring-ink/70" : ""
                   }`}
-                  style={mark ? { background: LEVEL_COLOR[mark.level as Level] } : undefined}
+                  style={mark ? { background: markBackground(mark) } : undefined}
                 />
               );
             })}

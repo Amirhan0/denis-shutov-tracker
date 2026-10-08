@@ -9,7 +9,7 @@ export default async function Page() {
   return (
     <div className="mx-auto max-w-2xl">
       <PageTitle eyebrow="оттенки дня" title="Настроение">
-        Выберите настроение, которое было главным в этот день.
+        Отметьте, какие настроения были в этот день — можно несколько.
       </PageTitle>
       <ColorTrackerView tracker="mood" today={today} initialMarks={await getMarks(user.id, "mood", "2000-01-01", "2999-12-31")} moods={await getMoods(true)} />
     </div>

@@ -1,6 +1,6 @@
 import "server-only";
 import { db } from "./db";
-import type { ColorTracker, EntryKind, Level, Mark, Mood } from "./trackers";
+import type { ColorTracker, EntryKind, Level, Mark, Mood, MoodPick } from "./trackers";
 
 export async function getMoods(includeInactive = false): Promise<Mood[]> {
   return (await db
@@ -10,10 +10,18 @@ export async function getMoods(includeInactive = false): Promise<Mood[]> {
 
 export async function getMarks(userId: number, tracker: ColorTracker, from: string, to: string): Promise<Record<string, Mark>> {
   const rows = await db
-    .prepare("SELECT date, level, mood_id, note FROM marks WHERE user_id = ? AND tracker = ? AND date BETWEEN ? AND ?")
-    .all(userId, tracker, from, to) as { date: string; level: Level; mood_id: number | null; note: string | null }[];
+    .prepare("SELECT date, level, mood_id, note, picks FROM marks WHERE user_id = ? AND tracker = ? AND date BETWEEN ? AND ?")
+    .all(userId, tracker, from, to) as { date: string; level: Level; mood_id: number | null; note: string | null; picks: string | null }[];
   const out: Record<string, Mark> = {};
-  for (const r of rows) out[r.date] = { level: r.level, moodId: r.mood_id, note: r.note };
+  for (const r of rows) {
+    const mark: Mark = { level: r.level, moodId: r.mood_id, note: r.note };
+    if (r.picks) {
+      try {
+        mark.picks = JSON.parse(r.picks) as MoodPick[];
+      } catch {}
+    }
+    out[r.date] = mark;
+  }
   return out;
 }
 

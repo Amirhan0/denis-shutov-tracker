@@ -6,7 +6,7 @@ import { addDays, diffDays, formatDay, formatDayLong, formatRange, isISODate, ra
 import { getClient, utcToLocalDate } from "@/lib/admin";
 import { getAssignments, getEntries, getHabitChecks, getHabitsInRange, getMarks, getMoods, habitActiveOn } from "@/lib/data";
 import { computeStats } from "@/lib/stats";
-import { LEVEL_COLOR, SCALES, type ColorTracker } from "@/lib/trackers";
+import { LEVEL_COLOR, SCALES, markBackground, moodPicks, type ColorTracker } from "@/lib/trackers";
 import { PageTitle } from "@/components/Shell";
 import { StatsView } from "@/components/StatsView";
 import { ResetLinkButton } from "@/components/AdminClientTools";
@@ -157,10 +157,16 @@ export default async function ClientPage({ params, searchParams }: PageProps<"/a
                   {(["rating", "anxiety", "mood"] as const).map((t) => {
                     const m = marks[t][d];
                     if (!m) return null;
-                    const label = t === "mood" ? (m.moodId ? moods.get(m.moodId) : m.note) ?? SCALES.mood.labels[m.level] : SCALES[t].labels[m.level];
+                    const label =
+                      t === "mood"
+                        ? moodPicks(m)
+                            .map((p) => (p.moodId ? moods.get(p.moodId) : p.note))
+                            .filter(Boolean)
+                            .join(", ") || SCALES.mood.labels[m.level]
+                        : SCALES[t].labels[m.level];
                     return (
                       <span key={t} className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm" style={{ background: LEVEL_COLOR[m.level] + "40" }}>
-                        <span className="h-2.5 w-2.5 rounded-full" style={{ background: LEVEL_COLOR[m.level] }} />
+                        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: t === "mood" ? markBackground(m) : LEVEL_COLOR[m.level] }} />
                         <span className="text-ink-soft">{{ rating: "День", anxiety: "Тревога", mood: "Настроение" }[t]}:</span> {label}
                       </span>
                     );

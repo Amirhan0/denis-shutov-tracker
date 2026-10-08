@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useState, useTransition, type ReactNode } from "react";
-import { setMark, toggleHabit } from "@/app/actions/trackers";
+import { setMark, setMoods, toggleHabit } from "@/app/actions/trackers";
+import { enqueue } from "@/lib/queue";
 import { formatDayLong } from "@/lib/dates";
-import { ENTRY_META, SCALES, type EntryKind, type Level, type Mark, type Mood } from "@/lib/trackers";
+import { ENTRY_META, SCALES, markFromPicks, moodPicks, type EntryKind, type Level, type Mark, type Mood } from "@/lib/trackers";
 import { Check, TRACKER_ICON } from "./Doodles";
 import { LinedTextarea, SaveStatus, useAutosave } from "./JournalView";
 import { LevelPicker, MoodPicker } from "./Pickers";
@@ -41,12 +42,13 @@ export function TodayView({ date, today, marks: initialMarks, moods, habits, che
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
-  function saveMark(tracker: "rating" | "anxiety" | "mood", mark: Mark) {
+  function saveMark(tracker: "rating" | "anxiety" | "mood", mark: Mark | null) {
     const prev = marks[tracker];
-    setMarks((m) => ({ ...m, [tracker]: mark }));
+    setMarks((m) => ({ ...m, [tracker]: mark ?? undefined }));
     startTransition(async () => {
       try {
-        await setMark(tracker, date, mark.level, mark.moodId ?? null, mark.note ?? null);
+        if (tracker === "mood") await enqueue(() => setMoods(date, moodPicks(mark ?? undefined)));
+        else if (mark) await setMark(tracker, date, mark.level, mark.moodId ?? null, mark.note ?? null);
       } catch {
         setMarks((m) => ({ ...m, [tracker]: prev }));
         setError("Не удалось сохранить — проверьте интернет.");
@@ -74,7 +76,11 @@ export function TodayView({ date, today, marks: initialMarks, moods, habits, che
     });
   }
 
-  const moodLabel = marks.mood ? (marks.mood.moodId ? moods.find((m) => m.id === marks.mood!.moodId)?.label : marks.mood.note) : null;
+  const moodLabel =
+    moodPicks(marks.mood)
+      .map((p) => (p.moodId ? moods.find((m) => m.id === p.moodId)?.label : p.note))
+      .filter(Boolean)
+      .join(", ") || null;
 
   return (
     <div className="space-y-4">
@@ -88,8 +94,8 @@ export function TodayView({ date, today, marks: initialMarks, moods, habits, che
         <LevelPicker compact tracker="anxiety" value={marks.anxiety?.level as Level | undefined} onChange={(l) => saveMark("anxiety", { level: l })} />
       </Section>
 
-      <Section icon="mood" title={SCALES.mood.question} done={!!marks.mood} aside={moodLabel && <span className="text-sm text-ink-soft">{moodLabel}</span>}>
-        <MoodPicker moods={moods} value={marks.mood} onChange={(m) => saveMark("mood", m)} />
+      <Section icon="mood" title={SCALES.mood.question} done={!!marks.mood} aside={moodLabel && <span className="max-w-[45%] truncate text-sm text-ink-soft">{moodLabel}</span>}>
+        <MoodPicker moods={moods} value={marks.mood} onChange={(picks) => saveMark("mood", markFromPicks(picks))} />
       </Section>
 
       <Section

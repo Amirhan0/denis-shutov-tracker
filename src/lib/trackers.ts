@@ -116,7 +116,31 @@ export const MAX_HABITS = 5;
 
 export type Mood = { id: number; label: string; zone: Level; active: number; position: number };
 
-export type Mark = { level: Level; moodId?: number | null; note?: string | null };
+/** Одно выбранное настроение (готовое из списка или своё — «Другое») */
+export type MoodPick = { moodId?: number | null; note?: string | null; level: Level };
+
+/** Отметка дня. Для настроения за день может быть несколько вариантов — `picks` в порядке выбора */
+export type Mark = { level: Level; moodId?: number | null; note?: string | null; picks?: MoodPick[] };
+
+export const MAX_MOOD_PICKS = 5;
+
+export function moodPicks(m: Mark | undefined): MoodPick[] {
+  if (!m) return [];
+  return m.picks?.length ? m.picks : [{ moodId: m.moodId, note: m.note, level: m.level }];
+}
+
+export function markFromPicks(picks: MoodPick[]): Mark | null {
+  if (!picks.length) return null;
+  return { level: Math.max(...picks.map((p) => p.level)) as Level, moodId: picks[0].moodId ?? null, note: picks[0].note ?? null, picks };
+}
+
+/** Фон клетки: один цвет или диагональные полосы, если за день отмечены разные зоны */
+export function markBackground(m: Mark): string {
+  const levels = [...new Set(moodPicks(m).map((p) => p.level))];
+  if (levels.length <= 1) return LEVEL_COLOR[m.level];
+  const step = 100 / levels.length;
+  return `linear-gradient(135deg, ${levels.map((l, i) => `${LEVEL_COLOR[l]} ${i * step}% ${(i + 1) * step}%`).join(", ")})`;
+}
 
 /** Подписи зон настроения для печатной версии */
 export const DEFAULT_MOODS_PRINT: Record<Level, string[]> = {
