@@ -33,3 +33,21 @@ export function ResetLinkButton({ userId }: { userId: number }) {
     </div>
   );
 }
+
+export function CopyButton({ text, label = "Скопировать ссылку", className = "btn btn-primary btn-sm" }: { text: string; label?: string; className?: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      className={className}
+      onClick={() =>
+        navigator.clipboard.writeText(text).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        })
+      }
+    >
+      {copied ? "Скопировано ✓" : label}
+    </button>
+  );
+}

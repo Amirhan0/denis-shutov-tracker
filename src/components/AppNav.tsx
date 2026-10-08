@@ -36,6 +36,7 @@ export const CLIENT_NAV: Item[] = [
 export const ADMIN_NAV: Item[] = [
   { href: "/admin", label: "Клиенты", icon: I.users },
   { href: "/admin/moods", label: "Настроения", icon: I.palette },
+  { href: "/admin/settings", label: "Профиль", icon: I.user },
 ];
 
 function isActive(path: string, href: string) {

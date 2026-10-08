@@ -24,6 +24,7 @@ export default async function SettingsPage() {
           Ваши записи видите только вы и ваш психолог. Для безопасности мы автоматически выходим из аккаунта после {IDLE_MINUTES} минут бездействия.
         </p>
         <div className="flex flex-wrap gap-x-5 gap-y-2 font-semibold">
+          <Link href="/" className="text-terracotta hover:underline">Главная страница сайта</Link>
           <Link href="/privacy" className="text-terracotta hover:underline">Политика конфиденциальности</Link>
           <Link href="/pdf" className="text-terracotta hover:underline">PDF-трекеры</Link>
           <a href={SITE.telegram} target="_blank" rel="noreferrer" className="text-terracotta hover:underline">Написать Денису</a>

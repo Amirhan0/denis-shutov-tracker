@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { IDLE_MINUTES } from "@/lib/auth";
 import { ADMIN_NAV, BottomNav, CLIENT_NAV, IdleLogout, TopNav } from "./AppNav";
 import { Logo } from "./Site";
@@ -9,8 +10,12 @@ export function Shell({ admin = false, children }: { admin?: boolean; children: 
       <header className="sticky top-0 z-30 border-b border-line/70 bg-cream/85 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-5 md:h-16">
           <Logo href={admin ? "/admin" : "/app"} compact={false} />
-          <TopNav items={items} />
-          {admin && <span className="rounded-full bg-bordeaux/10 px-3 py-1 text-xs font-semibold text-bordeaux md:hidden">админ</span>}
+          <div className="flex items-center gap-1">
+            <TopNav items={items} />
+            <Link href="/" className="rounded-full px-3 py-2 text-sm font-semibold text-ink-soft hover:bg-paper hover:text-ink">
+              На сайт ↗
+            </Link>
+          </div>
         </div>
       </header>
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-6 pb-28 sm:px-5 md:pb-16">{children}</main>

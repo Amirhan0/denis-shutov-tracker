@@ -4,12 +4,17 @@ import { relativeDay, todayIn } from "@/lib/dates";
 import { clientStatus, fillPercent, getClients, utcToLocalDate } from "@/lib/admin";
 import { PageTitle } from "@/components/Shell";
 import { StatusBadge } from "@/components/StatusBadge";
+import { CopyButton } from "@/components/AdminClientTools";
+import { Sprout } from "@/components/Doodles";
+import { appUrl } from "@/lib/url";
 
 export default async function AdminHome({ searchParams }: PageProps<"/admin">) {
   const tz = await getTz();
+  const inviteLink = `${await appUrl()}/register`;
   const today = todayIn(tz);
   const q = String((await searchParams).q ?? "").trim().toLowerCase();
-  const clients = (await getClients()).filter((c) => !q || c.name.toLowerCase().includes(q) || c.login.includes(q));
+  const all = await getClients();
+  const clients = all.filter((c) => !q || c.name.toLowerCase().includes(q) || c.login.includes(q));
   const rows = await Promise.all(
     clients.map(async (c) => {
       const last = utcToLocalDate(c.last_active_at, tz);
@@ -21,18 +26,36 @@ export default async function AdminHome({ searchParams }: PageProps<"/admin">) {
 
   return (
     <div>
-      <PageTitle eyebrow="панель психолога" title="Клиенты">
-        {rows.length} в списке{attention > 0 && <> · <span className="text-[#9a4a22]">{attention} требуют внимания</span></>}
-      </PageTitle>
-
-      <form className="mb-5">
-        <input name="q" defaultValue={q} placeholder="Поиск по имени, email или телефону" className="field max-w-md" />
-      </form>
+      {all.length === 0 ? (
+        <PageTitle eyebrow="панель психолога" title="Клиенты" />
+      ) : (
+        <>
+          <PageTitle eyebrow="панель психолога" title="Клиенты">
+            {rows.length} в списке{attention > 0 && <> · <span className="text-[#9a4a22]">{attention} требуют внимания</span></>}
+          </PageTitle>
+          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <form className="w-full max-w-md">
+              <input name="q" defaultValue={q} placeholder="Поиск по имени, email или телефону" className="field" />
+            </form>
+            <CopyButton text={inviteLink} label="Скопировать ссылку для клиента" className="btn btn-ghost btn-sm shrink-0" />
+          </div>
+        </>
+      )}
 
       {rows.length === 0 ? (
-        <div className="paper p-8 text-center text-ink-soft">
-          Пока нет клиентов. Отправьте им ссылку на регистрацию: <b>/register</b>
-        </div>
+        q ? (
+          <div className="paper p-8 text-center text-ink-soft">Никого не нашли по запросу «{q}»</div>
+        ) : (
+          <div className="paper flex flex-col items-center p-8 text-center sm:p-12">
+            <Sprout className="h-14 w-14 text-sage" />
+            <h2 className="mt-4 font-serif text-2xl">Здесь появятся ваши клиенты</h2>
+            <p className="mt-2 max-w-md text-ink-soft">
+              Отправьте клиенту ссылку на регистрацию. Как только он создаст кабинет, вы увидите его в этом списке.
+            </p>
+            <div className="mt-6 w-full max-w-md rounded-2xl bg-cream px-4 py-3 font-medium break-all text-ink">{inviteLink}</div>
+            <CopyButton text={inviteLink} className="btn btn-primary mt-4" />
+          </div>
+        )
       ) : (
         <>
           {/* Таблица на десктопе */}
