@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { IDLE_MINUTES } from "@/lib/auth";
+import { IDLE_MINUTES, getCurrentUser } from "@/lib/auth";
 import { ADMIN_NAV, BottomNav, CLIENT_NAV, IdleLogout, TopNav } from "./AppNav";
 import { Logo } from "./Site";
 
-export function Shell({ admin = false, children }: { admin?: boolean; children: React.ReactNode }) {
+export async function Shell({ admin = false, children }: { admin?: boolean; children: React.ReactNode }) {
   const items = admin ? ADMIN_NAV : CLIENT_NAV;
+  const user = await getCurrentUser();
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-30 border-b border-line/70 bg-cream/85 backdrop-blur-md">
@@ -20,7 +21,7 @@ export function Shell({ admin = false, children }: { admin?: boolean; children: 
       </header>
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-6 pb-28 sm:px-5 md:pb-16">{children}</main>
       <BottomNav items={items} />
-      <IdleLogout minutes={IDLE_MINUTES} />
+      {!user?.remember && <IdleLogout minutes={IDLE_MINUTES} />}
     </div>
   );
 }

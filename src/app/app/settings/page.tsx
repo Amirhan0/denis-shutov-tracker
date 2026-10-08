@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { logout } from "@/app/actions/auth";
-import { IDLE_MINUTES, requireClient } from "@/lib/auth";
+import { IDLE_MINUTES, REMEMBER_DAYS, requireClient } from "@/lib/auth";
 import { ChangePasswordForm } from "@/components/AuthForms";
 import { PageTitle } from "@/components/Shell";
 import { SITE } from "@/lib/site";
@@ -21,7 +21,10 @@ export default async function SettingsPage() {
       </div>
       <div className="paper space-y-3 p-5 text-sm text-ink-soft">
         <p>
-          Ваши записи видите только вы и ваш психолог. Для безопасности мы автоматически выходим из аккаунта после {IDLE_MINUTES} минут бездействия.
+          Ваши записи видите только вы и ваш психолог.{" "}
+          {user.remember
+            ? `Это устройство запомнено — вход сохранится, если заходить хотя бы раз в ${REMEMBER_DAYS} дней. На чужом устройстве не забудьте выйти.`
+            : `Для безопасности мы автоматически выходим из аккаунта после ${IDLE_MINUTES} минут бездействия.`}
         </p>
         <div className="flex flex-wrap gap-x-5 gap-y-2 font-semibold">
           <Link href="/" className="text-terracotta hover:underline">Главная страница сайта</Link>

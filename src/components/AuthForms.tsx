@@ -49,6 +49,10 @@ export function LoginForm() {
         </div>
         <PasswordInput autoComplete="current-password" />
       </div>
+      <label className="flex cursor-pointer items-center gap-3 text-sm text-ink-soft">
+        <input type="checkbox" name="remember" defaultChecked className="h-5 w-5 shrink-0 accent-terracotta" />
+        Запомнить меня на этом устройстве
+      </label>
       <Message state={state} />
       <button className="btn btn-primary w-full" disabled={pending}>{pending ? "Входим…" : "Войти"}</button>
     </form>
@@ -71,6 +75,10 @@ export function RegisterForm() {
         <label className="label">Пароль</label>
         <PasswordInput autoComplete="new-password" placeholder="Минимум 8 символов" />
       </div>
+      <label className="flex cursor-pointer items-center gap-3 text-sm text-ink-soft">
+        <input type="checkbox" name="remember" defaultChecked className="h-5 w-5 shrink-0 accent-terracotta" />
+        Запомнить меня на этом устройстве
+      </label>
       <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-cream/70 p-3 text-sm leading-snug text-ink-soft">
         <input type="checkbox" name="consent" required className="mt-0.5 h-5 w-5 shrink-0 accent-terracotta" />
         <span>

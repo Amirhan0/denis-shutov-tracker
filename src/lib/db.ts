@@ -119,6 +119,11 @@ function ready() {
   globalForDb.__dbReady ??= (async () => {
     if (URL.startsWith("file:")) fs.mkdirSync(path.dirname(LOCAL_PATH), { recursive: true });
     await client.executeMultiple(SCHEMA);
+    // миграция: флаг «запомнить меня» у сессий
+    const cols = await client.execute("PRAGMA table_info(sessions)");
+    if (!cols.rows.some((r) => r[1] === "remember")) {
+      await client.execute("ALTER TABLE sessions ADD COLUMN remember INTEGER NOT NULL DEFAULT 0");
+    }
     const rs = await client.execute("SELECT COUNT(*) AS n FROM moods");
     if (Number(rs.rows[0][0]) === 0) {
       await client.batch(

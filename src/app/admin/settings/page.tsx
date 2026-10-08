@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { logout } from "@/app/actions/auth";
-import { IDLE_MINUTES, requireAdmin } from "@/lib/auth";
+import { IDLE_MINUTES, REMEMBER_DAYS, requireAdmin } from "@/lib/auth";
 import { ChangePasswordForm } from "@/components/AuthForms";
 import { PageTitle } from "@/components/Shell";
 
@@ -23,7 +23,9 @@ export default async function AdminSettingsPage() {
         <ChangePasswordForm />
       </div>
       <p className="px-1 text-sm text-ink-soft">
-        Для безопасности данных клиентов выход из аккаунта происходит автоматически после {IDLE_MINUTES} минут бездействия.
+        {user.remember
+          ? `Это устройство запомнено на ${REMEMBER_DAYS} дней. Если входите с чужого устройства — не забудьте выйти.`
+          : `Для безопасности данных клиентов выход из аккаунта происходит автоматически после ${IDLE_MINUTES} минут бездействия.`}
       </p>
       <form action={logout}>
         <button className="btn btn-ghost w-full">Выйти из аккаунта</button>

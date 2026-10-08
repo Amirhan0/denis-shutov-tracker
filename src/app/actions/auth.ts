@@ -45,7 +45,7 @@ export async function register(_: FormState, fd: FormData): Promise<FormState> {
   const { lastInsertRowid } = await db
     .prepare("INSERT INTO users (name, login, password_hash, consent_at, last_active_at) VALUES (?, ?, ?, datetime('now'), datetime('now'))")
     .run(name.slice(0, 60), login, hash);
-  await createSession(Number(lastInsertRowid));
+  await createSession(Number(lastInsertRowid), fd.get("remember") === "on");
   redirect("/app/welcome");
 }
 
@@ -62,7 +62,7 @@ export async function login(_: FormState, fd: FormData): Promise<FormState> {
   const ok = await bcrypt.compare(password, user?.password_hash ?? (DUMMY_HASH ??= await bcrypt.hash("dummy", 12)));
   if (!user || !ok) return { error: "Неверный логин или пароль" };
 
-  await createSession(user.id);
+  await createSession(user.id, fd.get("remember") === "on");
   redirect(user.role === "admin" ? "/admin" : "/app");
 }
 

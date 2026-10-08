@@ -7,10 +7,14 @@ import { db } from "./db";
 import { DEFAULT_TZ, todayIn } from "./dates";
 
 export const SESSION_COOKIE = "ds_session";
+export const REMEMBER_COOKIE = "ds_remember";
 /** Автоматический выход при бездействии (минуты) */
 export const IDLE_MINUTES = Number(process.env.SESSION_IDLE_MINUTES || 30);
 const IDLE_MS = IDLE_MINUTES * 60 * 1000;
-const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+/** «Запомнить меня»: вход держится 30 дней с последнего визита */
+export const REMEMBER_DAYS = 30;
+const REMEMBER_MS = REMEMBER_DAYS * 24 * 60 * 60 * 1000;
+const MAX_AGE_MS = 180 * 24 * 60 * 60 * 1000;
 
 export type User = {
   id: number;
@@ -20,23 +24,38 @@ export type User = {
   onboarded: number;
   created_at: string;
   last_active_at: string | null;
+  /** сессия с «Запомнить меня» — без автовыхода по бездействию */
+  remember: boolean;
 };
 
 export function sha256(value: string) {
   return crypto.createHash("sha256").update(value).digest("hex");
 }
 
-export async function createSession(userId: number) {
-  const token = crypto.randomBytes(32).toString("base64url");
-  const now = Date.now();
-  await db.prepare("INSERT INTO sessions (id, user_id, created_at, last_seen) VALUES (?, ?, ?, ?)").run(sha256(token), userId, now, now);
-  await db.prepare("DELETE FROM sessions WHERE last_seen < ?").run(now - IDLE_MS);
-  (await cookies()).set(SESSION_COOKIE, token, {
+export function sessionCookieOptions(remember: boolean) {
+  return {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    sameSite: "lax" as const,
     path: "/",
-  });
+    // без maxAge cookie живёт до закрытия браузера
+    ...(remember ? { maxAge: REMEMBER_DAYS * 24 * 60 * 60 } : {}),
+  };
+}
+
+export async function createSession(userId: number, remember: boolean) {
+  const token = crypto.randomBytes(32).toString("base64url");
+  const now = Date.now();
+  await db
+    .prepare("INSERT INTO sessions (id, user_id, created_at, last_seen, remember) VALUES (?, ?, ?, ?, ?)")
+    .run(sha256(token), userId, now, now, remember ? 1 : 0);
+  await db
+    .prepare("DELETE FROM sessions WHERE (remember = 0 AND last_seen < ?) OR last_seen < ? OR created_at < ?")
+    .run(now - IDLE_MS, now - REMEMBER_MS, now - MAX_AGE_MS);
+  const jar = await cookies();
+  jar.set(SESSION_COOKIE, token, sessionCookieOptions(remember));
+  if (remember) jar.set(REMEMBER_COOKIE, "1", { ...sessionCookieOptions(true), httpOnly: true });
+  else jar.delete(REMEMBER_COOKIE);
 }
 
 export async function destroySession() {
@@ -44,19 +63,21 @@ export async function destroySession() {
   const token = jar.get(SESSION_COOKIE)?.value;
   if (token) await db.prepare("DELETE FROM sessions WHERE id = ?").run(sha256(token));
   jar.delete(SESSION_COOKIE);
+  jar.delete(REMEMBER_COOKIE);
 }
 
 export const getCurrentUser = cache(async (): Promise<User | null> => {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return null;
   const id = sha256(token);
-  const session = (await db.prepare("SELECT user_id, created_at, last_seen FROM sessions WHERE id = ?").get(id)) as
-    | { user_id: number; created_at: number; last_seen: number }
+  const session = (await db.prepare("SELECT user_id, created_at, last_seen, remember FROM sessions WHERE id = ?").get(id)) as
+    | { user_id: number; created_at: number; last_seen: number; remember: number }
     | undefined;
   if (!session) return null;
 
   const now = Date.now();
-  if (now - session.last_seen > IDLE_MS || now - session.created_at > MAX_AGE_MS) {
+  const idleLimit = session.remember ? REMEMBER_MS : IDLE_MS;
+  if (now - session.last_seen > idleLimit || now - session.created_at > MAX_AGE_MS) {
     await db.prepare("DELETE FROM sessions WHERE id = ?").run(id);
     return null;
   }
@@ -66,8 +87,8 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
 
   const user = (await db
     .prepare("SELECT id, name, login, role, onboarded, created_at, last_active_at FROM users WHERE id = ?")
-    .get(session.user_id)) as User | undefined;
-  return user ?? null;
+    .get(session.user_id)) as Omit<User, "remember"> | undefined;
+  return user ? { ...user, remember: !!session.remember } : null;
 });
 
 export async function requireUser(): Promise<User> {
