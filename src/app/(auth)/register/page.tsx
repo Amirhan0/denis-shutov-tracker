@@ -11,7 +11,7 @@ export default async function RegisterPage() {
     <>
       <p className="eyebrow">начнём</p>
       <h1 className="h-display mt-1 text-3xl">Ваш личный дневник</h1>
-      <p className="mt-2 text-sm text-ink-soft">Записи видите только вы и ваш психолог.</p>
+      <p className="mt-2 text-sm text-ink-soft">Ваши записи видите только вы и я — ваш психолог.</p>
       <div className="mt-6">
         <RegisterForm />
       </div>

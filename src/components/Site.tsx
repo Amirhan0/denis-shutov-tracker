@@ -24,7 +24,7 @@ export function SiteHeader({ authed }: { authed?: "client" | "admin" | null }) {
             Трекеры
           </a>
           <a href="/#about" className="hidden rounded-full px-3 py-2 text-ink-soft hover:text-ink md:block">
-            О Денисе
+            Обо мне
           </a>
           {authed ? (
             <Link href={authed === "admin" ? "/admin" : "/app"} className="btn btn-primary btn-sm ml-2">
@@ -56,9 +56,11 @@ export function SiteFooter() {
           <a href={SITE.telegram} target="_blank" rel="noreferrer" className="hover:text-ink">
             Telegram
           </a>
-          <a href={`mailto:${SITE.email}`} className="hover:text-ink">
-            {SITE.email}
-          </a>
+          {SITE.email && (
+            <a href={`mailto:${SITE.email}`} className="hover:text-ink">
+              {SITE.email}
+            </a>
+          )}
           <Link href="/privacy" className="hover:text-ink">
             Политика конфиденциальности
           </Link>

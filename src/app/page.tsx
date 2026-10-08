@@ -170,7 +170,7 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* О Денисе */}
+        {/* Обо мне */}
         <section id="about" className="scroll-mt-20 border-y border-line/70 bg-paper/60">
           <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-20 md:grid-cols-[0.8fr_1.2fr]">
             <div className="relative mx-auto w-64 md:w-full md:max-w-xs">
@@ -183,14 +183,14 @@ export default async function Home() {
               <Sprout className="absolute -right-6 -bottom-6 h-20 w-20 text-sage" />
             </div>
             <div>
-              <p className="eyebrow">о Денисе</p>
+              <p className="eyebrow">обо мне</p>
               <h2 className="h-display mt-2 text-4xl">Денис Шутов</h2>
               <p className="mt-6 text-lg leading-relaxed text-ink-soft">
-                Психолог. Помогает людям лучше понимать себя, свои эмоции и привычки — и бережно менять то, что хочется изменить.
+                Я психолог. Помогаю людям лучше понимать себя, свои эмоции и привычки — и бережно менять то, что хочется изменить.
               </p>
               <p className="mt-4 leading-relaxed text-ink-soft">
-                Трекеры — инструмент для работы между сессиями: они помогают заметить то, что обычно ускользает, и принести на
-                встречу не только ощущения, но и наблюдения.
+                Трекеры — инструмент, который я использую в работе между сессиями: они помогают заметить то, что обычно
+                ускользает, и принести на встречу не только ощущения, но и наблюдения.
               </p>
             </div>
           </div>
@@ -205,10 +205,10 @@ export default async function Home() {
           </p>
           <div className="mt-10 flex flex-col justify-center gap-3 sm:flex-row">
             <a href={SITE.instagram} target="_blank" rel="noreferrer" className="btn btn-ghost">
-              Instagram Дениса
+              Мой Instagram
             </a>
             <a href={SITE.telegram} target="_blank" rel="noreferrer" className="btn btn-ghost">
-              Telegram Дениса
+              Написать мне в Telegram
             </a>
           </div>
         </section>

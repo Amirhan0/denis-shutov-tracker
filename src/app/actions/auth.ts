@@ -79,7 +79,7 @@ export async function logoutIdle() {
 export async function requestReset(_: FormState, fd: FormData): Promise<FormState> {
   const login = normalizeLogin(String(fd.get("login") ?? ""));
   const done: FormState = {
-    ok: "Если такой аккаунт существует, мы отправили ссылку для восстановления на почту. Если вы регистрировались по телефону — напишите Денису, он пришлёт ссылку.",
+    ok: "Если такой аккаунт существует, мы отправили ссылку для восстановления на почту. Если вы регистрировались по телефону — напишите мне в Telegram, и я пришлю ссылку.",
   };
   if (!rateLimit("reset:" + (await clientIp()), 5)) return { error: "Слишком много попыток, попробуйте позже" };
 
